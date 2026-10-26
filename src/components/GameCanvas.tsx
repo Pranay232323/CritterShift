@@ -7,6 +7,7 @@ import HUD from "./HUD";
 import PauseMenu from "./PauseMenu";
 import LevelCompleteScreen from "./LevelCompleteScreen";
 import { getLevelById } from "../game/levelData";
+import { getVehicle } from "../game/vehicles";
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -17,8 +18,10 @@ export default function GameCanvas() {
   const setStatus = useGameStore((s) => s.setStatus);
   const updateHud = useGameStore((s) => s.updateHud);
   const completeLevel = useGameStore((s) => s.completeLevel);
+  const bankEnergy = useGameStore((s) => s.bankEnergy);
   const save = useGameStore((s) => s.save);
   const selectedLevelId = useGameStore((s) => s.selectedLevelId);
+  const selectedVehicleId = useGameStore((s) => s.selectedVehicleId);
   const restart = useGameStore((s) => s.restart);
 
   // Mount / unmount the physics + render engine exactly once per run.
@@ -28,12 +31,20 @@ export default function GameCanvas() {
     if (!canvas || !container) return;
 
     audio.setMuted(save.muted);
-    const game = new CritterShiftGame(canvas, getColorScheme(save.selectedColor), getLevelById(selectedLevelId), {
-      onHud: (hud) => updateHud(hud),
-      onComplete: (stats) => {
-        completeLevel(stats);
-      },
-    });
+    const game = new CritterShiftGame(
+      canvas,
+      getColorScheme(save.selectedColor),
+      getLevelById(selectedLevelId),
+      getVehicle(selectedVehicleId),
+      save.vehicleUpgrades,
+      {
+        onHud: (hud) => updateHud(hud),
+        onComplete: (stats) => {
+          completeLevel(stats);
+        },
+        onEnergyCollected: bankEnergy,
+      }
+    );
     gameRef.current = game;
 
     const resize = () => {
@@ -60,6 +71,11 @@ export default function GameCanvas() {
     if (!game) return;
     if (status === "paused") game.pause();
     else if (status === "playing") game.resume();
+  }, [status]);
+
+  useEffect(() => {
+    if (status === "playing") audio.setMusicPlaying(true);
+    else audio.setMusicPlaying(false);
   }, [status]);
 
   // Escape toggles pause.

@@ -19,6 +19,9 @@ type SfxName =
 export class AudioManager {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private musicTimer: number | null = null;
+  private musicStep = 0;
+  private musicPlaying = false;
   muted = false;
 
   private ensure() {
@@ -27,7 +30,7 @@ export class AudioManager {
       const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new Ctor();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.35;
+      this.master.gain.value = 0.5;
       this.master.connect(this.ctx.destination);
     } catch {
       this.ctx = null;
@@ -36,12 +39,46 @@ export class AudioManager {
 
   resume() {
     this.ensure();
-    this.ctx?.resume().catch(() => {});
+    if (this.ctx?.state === "suspended") {
+      void this.ctx.resume().then(() => this.scheduleMusic()).catch(() => {});
+    }
   }
 
   setMuted(muted: boolean) {
     this.muted = muted;
-    if (this.master) this.master.gain.value = muted ? 0 : 0.35;
+    if (this.master) this.master.gain.value = muted ? 0 : 0.5;
+    if (!muted) {
+      this.resume();
+      this.scheduleMusic();
+    }
+  }
+
+  setMusicPlaying(playing: boolean) {
+    this.musicPlaying = playing;
+    if (!playing) {
+      if (this.musicTimer !== null) window.clearTimeout(this.musicTimer);
+      this.musicTimer = null;
+      return;
+    }
+    this.ensure();
+    if (this.ctx?.state === "suspended") {
+      void this.ctx.resume().then(() => this.scheduleMusic()).catch(() => {});
+    } else {
+      this.scheduleMusic();
+    }
+  }
+
+  private scheduleMusic() {
+    if (!this.musicPlaying || this.musicTimer !== null || !this.ctx || this.muted) return;
+    const melody = [523.25, 659.25, 783.99, 659.25, 587.33, 698.46, 880, 698.46];
+    const note = melody[this.musicStep % melody.length];
+    this.tone(note, 0.32, "sine", note * 1.01, 0.18);
+    if (this.musicStep % 4 === 0) this.tone(note / 2, 0.62, "triangle", note / 2, 0.12);
+    this.musicStep++;
+    this.musicTimer = window.setTimeout(() => {
+      this.musicTimer = null;
+      this.scheduleMusic();
+    }, 360);
   }
 
   private tone(freq: number, duration: number, type: OscillatorType = "sine", glideTo?: number, vol = 1) {
@@ -61,6 +98,10 @@ export class AudioManager {
   }
 
   play(name: SfxName) {
+    this.ensure();
+    if (this.ctx?.state === "suspended") {
+      void this.ctx.resume().then(() => this.scheduleMusic()).catch(() => {});
+    }
     switch (name) {
       case "jump":
         this.tone(320, 0.18, "square", 540, 0.25);

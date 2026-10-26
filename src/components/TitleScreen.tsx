@@ -105,8 +105,9 @@ export default function TitleScreen() {
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-5">
           <Control keys="A / ←" desc="Reverse / Brake" />
           <Control keys="D / →" desc="Accelerate" />
-          <Control keys="Space" desc="Jump / Flap" />
-          <Control keys="Q" desc="Switch Form" />
+          <Control keys="Space" desc="Jump / Gap Flap" />
+          <Control keys="Q" desc="Wings / Rails in Obstacles" />
+          <Control keys="W / S" desc="Choose Rail Route" />
           <Control keys="R" desc="Recover" />
         </div>
       </div>

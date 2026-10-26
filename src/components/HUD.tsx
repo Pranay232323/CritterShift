@@ -14,7 +14,7 @@ function formatTime(ms: number): string {
   return `${m}:${s}`;
 }
 
-type TouchControl = "left" | "right" | "jump";
+type TouchControl = "left" | "right" | "up" | "down" | "jump";
 type TouchAction = "form" | "recover";
 
 export default function HUD({
@@ -101,12 +101,15 @@ export default function HUD({
           <span className="text-sm font-extrabold tracking-wider text-white">{meta.label}</span>
         </div>
         <div className="rounded-xl bg-black/30 px-2.5 py-1 text-xs font-semibold text-white/80 backdrop-blur-sm">
-          Q · switch form
+          {hud.nearMagnetSurface || hud.form === "magnet" ? "Q · magnet rails" : hud.canGlide ? "Wings · hold jump to flap" : "Roll · wings unlock at gaps"}
+        </div>
+        <div className="rounded-xl bg-black/25 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/75 backdrop-blur-sm">
+          {hud.grounded ? "On the ground" : "In the air"}
         </div>
       </div>
 
       {/* Speed */}
-      <div className="absolute bottom-20 right-3 rounded-2xl bg-black/35 px-3 py-2 text-right text-white ring-1 ring-white/20 backdrop-blur-sm sm:bottom-4 sm:right-4">
+      <div className={`absolute right-3 rounded-2xl bg-black/35 px-3 py-2 text-right text-white ring-1 ring-white/20 backdrop-blur-sm sm:bottom-4 sm:right-4 ${hud.magnetAttached ? "bottom-44" : "bottom-20"}`}>
         <div className="text-xl font-bold tabular-nums leading-none">{hud.speedKph}</div>
         <div className="text-[10px] font-semibold tracking-widest text-white/60">KPH</div>
       </div>
@@ -125,13 +128,13 @@ export default function HUD({
             className="absolute left-1/2 top-28 -translate-x-1/2 rounded-2xl bg-black/30 px-4 py-2 text-center text-xs font-semibold text-white/85 backdrop-blur-sm transition-opacity duration-1000 sm:hidden"
             style={{ opacity: hud.elapsedMs > 5500 ? 0 : 1 }}
           >
-            Tap arrows to drive · Hold JUMP to flap · SHIFT to transform
+            Tap arrows to drive · hold JUMP to flap in flight zones
           </div>
           <div
             className="absolute left-1/2 top-16 hidden -translate-x-1/2 rounded-2xl bg-black/30 px-4 py-2 text-xs font-semibold text-white/85 backdrop-blur-sm transition-opacity duration-1000 sm:block"
             style={{ opacity: hud.elapsedMs > 5500 ? 0 : 1 }}
           >
-            A/D move · Space jump · Q shift form · R recover · Esc pause
+            A/D move · Space jump/flap · Q magnet · W/S rail routes · R recover
           </div>
         </>
       )}
@@ -141,8 +144,24 @@ export default function HUD({
         <TouchButton label="▶" ariaLabel="Move right" onPress={(active) => onControl("right", active)} />
         <TouchButton label="JUMP" ariaLabel="Jump or flap" onPress={(active) => onControl("jump", active)} />
       </div>
+      {hud.form === "magnet" && hud.magnetAttached && (
+        <div className="pointer-events-auto absolute bottom-20 right-3 flex flex-col items-center gap-1 md:hidden">
+          <TouchButton label="▲" ariaLabel="Choose upper magnet route" onPress={(active) => onControl("up", active)} />
+          <div className="flex gap-1">
+            <TouchButton label="◀" ariaLabel="Choose left magnet route" onPress={(active) => onControl("left", active)} />
+            <TouchButton label="▼" ariaLabel="Choose lower magnet route" onPress={(active) => onControl("down", active)} />
+            <TouchButton label="▶" ariaLabel="Choose right magnet route" onPress={(active) => onControl("right", active)} />
+          </div>
+        </div>
+      )}
       <div className="pointer-events-auto absolute bottom-3 right-3 flex items-end gap-2 md:hidden">
-        <TouchButton label="SHIFT" ariaLabel="Switch movement form" onPress={(active) => active && onAction("form")} />
+        {(hud.canGlide || hud.nearMagnetSurface || hud.magnetAttached || hud.form === "glide") && (
+          <TouchButton
+            label={hud.form === "glide" ? "ROLL" : hud.canGlide ? "WINGS" : "MAGNET"}
+            ariaLabel={hud.form === "glide" ? "Return to roll form" : hud.canGlide ? "Deploy glider for obstacle" : "Attach to magnet rails"}
+            onPress={(active) => active && onAction("form")}
+          />
+        )}
         <TouchButton label="RECOVER" ariaLabel="Recover at checkpoint" onPress={(active) => active && onAction("recover")} />
       </div>
     </div>

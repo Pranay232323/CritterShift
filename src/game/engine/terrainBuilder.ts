@@ -36,11 +36,11 @@ function segmentBody(x1: number, y1: number, x2: number, y2: number, thickness: 
   const angle = Math.atan2(dy, dx);
   const cx = (x1 + x2) / 2;
   const cy = (y1 + y2) / 2;
-  const body = Bodies.rectangle(cx, cy, length, thickness, {
+  const body = Bodies.rectangle(cx, cy, length + 8, thickness, {
     isStatic: true,
     angle,
-    friction: 0.85,
-    frictionStatic: 1,
+    friction: label === "ground" ? 0.65 : 0.8,
+    frictionStatic: 0.9,
     restitution: 0,
     label,
     collisionFilter: { category: CAT.GROUND, mask: 0xffffffff },
@@ -58,7 +58,8 @@ export function buildWorld(level: LevelDefinition): BuiltWorld {
     for (let i = 0; i < chain.length - 1; i++) {
       const a = chain[i];
       const b = chain[i + 1];
-      staticBodies.push(segmentBody(a.x, a.y, b.x, b.y, 36, "ground"));
+      if (Math.hypot(b.x - a.x, b.y - a.y) < 1) continue;
+      staticBodies.push(segmentBody(a.x, a.y, b.x, b.y, 12, "ground"));
     }
   }
 

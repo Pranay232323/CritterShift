@@ -54,6 +54,7 @@ export interface LevelDefinition {
   magnetSegments: MagnetSegment[];
   collectibles: Collectible[];
   hiddenCollectibles: Collectible[];
+  flightZones: { id: string; startX: number; endX: number }[];
   checkpoints: Checkpoint[];
   finish: Rect;
   startPosition: Point;
@@ -119,29 +120,6 @@ function rollingTerrain(
     points.push({ x: endX, y: baseY });
   }
   return points;
-}
-
-function stretchLevel(level: LevelDefinition, factor: number): LevelDefinition {
-  const scalePoint = (point: Point): Point => ({ ...point, x: point.x * factor });
-  return {
-    ...level,
-    groundPolylines: level.groundPolylines.map((chain) => chain.map(scalePoint)),
-    platforms: level.platforms.map((platform) => ({ ...platform, x: platform.x * factor, w: platform.w * factor })),
-    hazards: level.hazards.map((hazard) => ({ ...hazard, x: hazard.x * factor, w: hazard.w * factor })),
-    magnetSegments: level.magnetSegments.map((segment) => ({
-      ...segment,
-      x1: segment.x1 * factor,
-      x2: segment.x2 * factor,
-    })),
-    collectibles: level.collectibles.map((collectible) => ({ ...collectible, ...scalePoint(collectible) })),
-    hiddenCollectibles: level.hiddenCollectibles.map((collectible) => ({ ...collectible, ...scalePoint(collectible) })),
-    checkpoints: level.checkpoints.map((checkpoint) => ({ ...checkpoint, ...scalePoint(checkpoint) })),
-    finish: { ...level.finish, x: level.finish.x * factor, w: level.finish.w * factor },
-    startPosition: scalePoint(level.startPosition),
-    worldMinX: level.worldMinX * factor,
-    worldMaxX: level.worldMaxX * factor,
-    landmarks: level.landmarks.map((landmark) => ({ ...landmark, x: landmark.x * factor })),
-  };
 }
 
 const gardenGround: Point[][] = [
@@ -235,6 +213,10 @@ const garden: LevelDefinition = {
   magnetSegments: gardenMagnets,
   collectibles: gardenCollectibles,
   hiddenCollectibles: gardenHidden,
+  flightZones: [
+    { id: "garden-jump-gap", startX: 1510, endX: 2160 },
+    { id: "garden-chasm", startX: 3840, endX: 5200 },
+  ],
   checkpoints: gardenCheckpoints,
   finish: { x: 6820, y: BASELINE - 120, w: 70, h: 220 },
   startPosition: { x: -40, y: BASELINE - 80 },
@@ -250,10 +232,22 @@ const garden: LevelDefinition = {
 };
 
 const hollowGround: Point[][] = [
-  [...flat(-200, 520, BASELINE), ...bumps(520, 1250, BASELINE, 30, 300), ...ramp(1250, BASELINE, 1480, BASELINE - 130)],
-  [...ramp(1740, BASELINE - 130, 1960, BASELINE), ...flat(1960, 2580, BASELINE)],
-  [...flat(2980, 3500, BASELINE), ...ramp(3500, BASELINE, 3700, BASELINE - 140)],
-  [...ramp(4270, BASELINE - 140, 4480, BASELINE), ...flat(4480, 5550, BASELINE)],
+  [...rollingTerrain(-200, 1500, BASELINE, [
+    { amplitude: 24, wavelength: 520, phase: 0 },
+    { amplitude: 18, wavelength: 270, phase: 90 },
+  ]), ...ramp(1500, BASELINE, 1900, BASELINE - 150, 24)],
+  [...ramp(2200, BASELINE - 150, 2580, BASELINE, 24), ...rollingTerrain(2580, 4100, BASELINE, [
+    { amplitude: 38, wavelength: 1000, phase: 200 },
+    { amplitude: 16, wavelength: 460, phase: 0 },
+  ]), ...ramp(4100, BASELINE, 4400, BASELINE - 180, 24)],
+  [...ramp(4800, BASELINE - 180, 5200, BASELINE, 24), ...rollingTerrain(5200, 6900, BASELINE, [
+    { amplitude: 48, wavelength: 1300, phase: 420 },
+    { amplitude: 16, wavelength: 500, phase: 50 },
+  ])],
+  [...rollingTerrain(7200, 8650, BASELINE - 20, [
+    { amplitude: 34, wavelength: 660, phase: 200 },
+    { amplitude: 18, wavelength: 300, phase: 100 },
+  ])],
 ];
 const hollow: LevelDefinition = {
   id: "mushroom-hollow",
@@ -268,51 +262,76 @@ const hollow: LevelDefinition = {
   },
   groundPolylines: hollowGround,
   platforms: [
-    { x: 2520, y: 430, w: 130, h: 20 },
-    { x: 2720, y: 365, w: 130, h: 20 },
-    { x: 2920, y: 430, w: 130, h: 20 },
+    { x: 1530, y: 470, w: 140, h: 20 },
+    { x: 1730, y: 430, w: 140, h: 20 },
+    { x: 1930, y: 410, w: 150, h: 20 },
+    { x: 2130, y: 430, w: 150, h: 20 },
+    { x: 3000, y: 445, w: 150, h: 20 },
+    { x: 3260, y: 380, w: 150, h: 20 },
+    { x: 3520, y: 435, w: 150, h: 20 },
+    { x: 4480, y: 470, w: 150, h: 20 },
+    { x: 4700, y: 420, w: 150, h: 20 },
+    { x: 5680, y: 470, w: 160, h: 20 },
+    { x: 5940, y: 410, w: 160, h: 20 },
+    { x: 6950, y: 460, w: 140, h: 20 },
+    { x: 7140, y: 430, w: 140, h: 20 },
   ],
   hazards: [
-    { x: 2580, y: 640, w: 400, h: 40 },
-    { x: 3700, y: 640, w: 570, h: 40 },
+    { x: 1900, y: 680, w: 300, h: 60 },
+    { x: 4400, y: 700, w: 400, h: 70 },
+    { x: 6900, y: 680, w: 300, h: 60 },
   ],
   magnetSegments: [
-    { id: "hollow-wall", x1: 4820, y1: 470, x2: 4820, y2: 240 },
-    { id: "hollow-ceiling", x1: 4820, y1: 240, x2: 5110, y2: 240 },
-    { id: "hollow-drop", x1: 5110, y1: 240, x2: 5110, y2: 470 },
+    { id: "hollow-wall", x1: 7420, y1: 470, x2: 7420, y2: 230 },
+    { id: "hollow-ceiling", x1: 7420, y1: 230, x2: 7790, y2: 230 },
+    { id: "hollow-drop", x1: 7790, y1: 230, x2: 7790, y2: 470 },
   ],
   collectibles: [
-    { id: "h1", x: 280, y: 500 }, { id: "h2", x: 750, y: 450 }, { id: "h3", x: 1110, y: 480 },
-    { id: "h4", x: 1610, y: 300 }, { id: "h5", x: 2140, y: 500 }, { id: "h6", x: 2560, y: 390 },
-    { id: "h7", x: 2760, y: 325 }, { id: "h8", x: 2960, y: 390 }, { id: "h9", x: 3250, y: 500 },
-    { id: "h10", x: 3850, y: 350 }, { id: "h11", x: 4100, y: 300 }, { id: "h12", x: 4380, y: 380 },
-    { id: "h13", x: 4630, y: 500 }, { id: "h14", x: 4930, y: 200 }, { id: "h15", x: 5250, y: 480 },
+    { id: "h1", x: 300, y: 485 }, { id: "h2", x: 900, y: 455 }, { id: "h3", x: 1450, y: 480 },
+    { id: "h4", x: 1780, y: 300 }, { id: "h5", x: 2350, y: 400 }, { id: "h6", x: 3100, y: 405 },
+    { id: "h7", x: 3390, y: 340 }, { id: "h8", x: 3820, y: 440 }, { id: "h9", x: 4170, y: 360 },
+    { id: "h10", x: 4580, y: 285 }, { id: "h11", x: 5100, y: 470 }, { id: "h12", x: 5680, y: 430 },
+    { id: "h13", x: 6020, y: 375 }, { id: "h14", x: 7500, y: 180 }, { id: "h15", x: 8200, y: 470 },
   ],
-  hiddenCollectibles: [{ id: "hollow-hidden", x: 5110, y: 190 }],
+  hiddenCollectibles: [{ id: "hollow-hidden", x: 7600, y: 180 }],
+  flightZones: [
+    { id: "hollow-gap-one", startX: 1430, endX: 2280 },
+    { id: "hollow-gap-two", startX: 4050, endX: 4840 },
+    { id: "hollow-gap-three", startX: 6820, endX: 7300 },
+  ],
   checkpoints: [
-    { id: "hollow-cp0", x: -120, y: 500 },
-    { id: "hollow-cp1", x: 2040, y: 500 },
-    { id: "hollow-cp2", x: 3050, y: 500 },
-    { id: "hollow-cp3", x: 4510, y: 500 },
+    { id: "hollow-cp0", x: -140, y: BASELINE - 24 },
+    { id: "hollow-cp1", x: 2700, y: BASELINE - 24 },
+    { id: "hollow-cp2", x: 5450, y: BASELINE - 24 },
+    { id: "hollow-cp3", x: 7200, y: BASELINE - 44 },
   ],
-  finish: { x: 5440, y: 440, w: 70, h: 220 },
-  startPosition: { x: -40, y: 480 },
+  finish: { x: 8550, y: 440, w: 80, h: 220 },
+  startPosition: { x: -40, y: BASELINE - 34 },
   worldMinX: -300,
-  worldMaxX: 5650,
+  worldMaxX: 8800,
   deathY: 1000,
   landmarks: [
-    { x: 1420, y: BASELINE, label: "jump" },
-    { x: 3580, y: BASELINE, label: "glide" },
-    { x: 4780, y: BASELINE, label: "magnet" },
-    { x: 5380, y: BASELINE, label: "finish" },
+    { x: 1700, y: BASELINE, label: "jump" },
+    { x: 4300, y: BASELINE, label: "glide" },
+    { x: 7460, y: BASELINE, label: "magnet" },
+    { x: 8500, y: BASELINE, label: "finish" },
   ],
 };
 
 const canopyGround: Point[][] = [
-  [...flat(-200, 650, BASELINE), ...ramp(650, BASELINE, 930, BASELINE - 170)],
-  [...ramp(1230, BASELINE - 170, 1510, BASELINE), ...flat(1510, 2200, BASELINE)],
-  [...flat(2600, 3120, BASELINE), ...ramp(3120, BASELINE, 3400, BASELINE - 160)],
-  [...ramp(4000, BASELINE - 160, 4280, BASELINE), ...flat(4280, 5100, BASELINE)],
+  [...flat(-200, 700, BASELINE), ...ramp(700, BASELINE, 1450, BASELINE - 190, 24)],
+  [...ramp(1770, BASELINE - 190, 2150, BASELINE - 20, 24), ...rollingTerrain(2150, 3850, BASELINE - 20, [
+    { amplitude: 46, wavelength: 900, phase: 210 },
+    { amplitude: 18, wavelength: 430, phase: 80 },
+  ]), ...ramp(3850, BASELINE - 20, 4250, BASELINE + 50, 24)],
+  [...ramp(4650, BASELINE + 50, 5200, BASELINE - 100, 24), ...rollingTerrain(5200, 7600, BASELINE - 100, [
+    { amplitude: 56, wavelength: 1100, phase: 0 },
+    { amplitude: 22, wavelength: 500, phase: 130 },
+  ]), ...ramp(7600, BASELINE - 100, 8000, BASELINE - 220, 24)],
+  [...ramp(8420, BASELINE - 220, 8900, BASELINE - 30, 24), ...rollingTerrain(8900, 10400, BASELINE - 30, [
+    { amplitude: 55, wavelength: 740, phase: 260 },
+    { amplitude: 22, wavelength: 310, phase: 60 },
+  ])],
 ];
 const canopy: LevelDefinition = {
   id: "clockwork-canopy",
@@ -327,43 +346,57 @@ const canopy: LevelDefinition = {
   },
   groundPolylines: canopyGround,
   platforms: [
-    { x: 2150, y: 450, w: 130, h: 20 },
-    { x: 2370, y: 390, w: 130, h: 20 },
-    { x: 2570, y: 450, w: 130, h: 20 },
+    { x: 1510, y: 460, w: 150, h: 20 },
+    { x: 1710, y: 415, w: 150, h: 20 },
+    { x: 2500, y: 420, w: 160, h: 20 },
+    { x: 2780, y: 350, w: 160, h: 20 },
+    { x: 3060, y: 410, w: 160, h: 20 },
+    { x: 4350, y: 470, w: 150, h: 20 },
+    { x: 4540, y: 440, w: 150, h: 20 },
+    { x: 6700, y: 400, w: 180, h: 20 },
+    { x: 7000, y: 340, w: 180, h: 20 },
+    { x: 8090, y: 450, w: 150, h: 20 },
+    { x: 8270, y: 410, w: 150, h: 20 },
   ],
   hazards: [
-    { x: 2200, y: 640, w: 400, h: 40 },
-    { x: 3400, y: 640, w: 600, h: 40 },
+    { x: 1450, y: 700, w: 320, h: 70 },
+    { x: 4250, y: 720, w: 400, h: 80 },
+    { x: 8000, y: 700, w: 420, h: 70 },
   ],
   magnetSegments: [
-    { id: "canopy-rise", x1: 4510, y1: 470, x2: 4510, y2: 220 },
-    { id: "canopy-bridge", x1: 4510, y1: 220, x2: 4800, y2: 220 },
-    { id: "canopy-fall", x1: 4800, y1: 220, x2: 4800, y2: 470 },
+    { id: "canopy-rise", x1: 9250, y1: 430, x2: 9250, y2: 180 },
+    { id: "canopy-bridge", x1: 9250, y1: 180, x2: 9650, y2: 180 },
+    { id: "canopy-fall", x1: 9650, y1: 180, x2: 9650, y2: 430 },
   ],
   collectibles: [
-    { id: "c1", x: 250, y: 490 }, { id: "c2", x: 700, y: 430 }, { id: "c3", x: 1050, y: 300 },
-    { id: "c4", x: 1320, y: 300 }, { id: "c5", x: 1800, y: 500 }, { id: "c6", x: 2200, y: 410 },
-    { id: "c7", x: 2420, y: 350 }, { id: "c8", x: 2640, y: 410 }, { id: "c9", x: 2880, y: 500 },
-    { id: "c10", x: 3500, y: 360 }, { id: "c11", x: 3740, y: 300 }, { id: "c12", x: 3970, y: 360 },
-    { id: "c13", x: 4380, y: 500 }, { id: "c14", x: 4650, y: 180 }, { id: "c15", x: 4930, y: 480 },
+    { id: "c1", x: 250, y: 490 }, { id: "c2", x: 800, y: 430 }, { id: "c3", x: 1200, y: 300 },
+    { id: "c4", x: 1580, y: 265 }, { id: "c5", x: 2100, y: 445 }, { id: "c6", x: 2600, y: 380 },
+    { id: "c7", x: 2900, y: 310 }, { id: "c8", x: 3350, y: 390 }, { id: "c9", x: 3900, y: 350 },
+    { id: "c10", x: 4450, y: 270 }, { id: "c11", x: 5050, y: 370 }, { id: "c12", x: 5700, y: 290 },
+    { id: "c13", x: 6600, y: 360 }, { id: "c14", x: 9400, y: 130 }, { id: "c15", x: 10100, y: 440 },
   ],
-  hiddenCollectibles: [{ id: "canopy-hidden", x: 4510, y: 170 }],
+  hiddenCollectibles: [{ id: "canopy-hidden", x: 9450, y: 130 }],
+  flightZones: [
+    { id: "canopy-gap-one", startX: 1300, endX: 1840 },
+    { id: "canopy-gap-two", startX: 3780, endX: 4690 },
+    { id: "canopy-gap-three", startX: 7530, endX: 8460 },
+  ],
   checkpoints: [
-    { id: "canopy-cp0", x: -120, y: 500 },
-    { id: "canopy-cp1", x: 1600, y: 500 },
-    { id: "canopy-cp2", x: 2680, y: 500 },
-    { id: "canopy-cp3", x: 4310, y: 500 },
+    { id: "canopy-cp0", x: -140, y: BASELINE - 24 },
+    { id: "canopy-cp1", x: 2450, y: BASELINE - 70 },
+    { id: "canopy-cp2", x: 5600, y: BASELINE - 70 },
+    { id: "canopy-cp3", x: 9000, y: BASELINE - 54 },
   ],
-  finish: { x: 5010, y: 440, w: 70, h: 220 },
-  startPosition: { x: -40, y: 480 },
+  finish: { x: 10300, y: BASELINE - 120, w: 80, h: 220 },
+  startPosition: { x: -40, y: BASELINE - 34 },
   worldMinX: -300,
-  worldMaxX: 5220,
+  worldMaxX: 10500,
   deathY: 1000,
   landmarks: [
-    { x: 900, y: BASELINE, label: "jump" },
-    { x: 3100, y: BASELINE, label: "glide" },
-    { x: 4470, y: BASELINE, label: "magnet" },
-    { x: 4950, y: BASELINE, label: "finish" },
+    { x: 1100, y: BASELINE, label: "jump" },
+    { x: 4400, y: BASELINE, label: "glide" },
+    { x: 9300, y: BASELINE, label: "magnet" },
+    { x: 10200, y: BASELINE, label: "finish" },
   ],
 };
 
@@ -373,12 +406,12 @@ const sunscorchGround: Point[][] = [
     { amplitude: 30, wavelength: 570, phase: 260 },
   ]),
   rollingTerrain(4300, 8000, BASELINE + 12, [
-    { amplitude: 82, wavelength: 1480, phase: 600 },
-    { amplitude: 38, wavelength: 460, phase: 100 },
+    { amplitude: 70, wavelength: 1700, phase: 600 },
+    { amplitude: 24, wavelength: 600, phase: 100 },
   ]),
   rollingTerrain(8500, 12400, BASELINE - 8, [
-    { amplitude: 94, wavelength: 1840, phase: 150 },
-    { amplitude: 42, wavelength: 520, phase: 300 },
+    { amplitude: 75, wavelength: 1900, phase: 150 },
+    { amplitude: 30, wavelength: 650, phase: 300 },
   ]),
 ];
 const sunscorch: LevelDefinition = {
@@ -395,8 +428,9 @@ const sunscorch: LevelDefinition = {
   groundPolylines: sunscorchGround,
   platforms: [
     { x: 3300, y: 450, w: 150, h: 22 }, { x: 3540, y: 405, w: 150, h: 22 },
-    { x: 3780, y: 450, w: 150, h: 22 }, { x: 7900, y: 430, w: 170, h: 22 },
-    { x: 8150, y: 370, w: 170, h: 22 },
+    { x: 3780, y: 450, w: 150, h: 22 }, { x: 4000, y: 425, w: 150, h: 22 },
+    { x: 4180, y: 460, w: 150, h: 22 }, { x: 7900, y: 430, w: 170, h: 22 },
+    { x: 8150, y: 370, w: 170, h: 22 }, { x: 8370, y: 430, w: 140, h: 22 },
   ],
   hazards: [
     { x: 3880, y: 700, w: 420, h: 80 }, { x: 8000, y: 700, w: 500, h: 80 },
@@ -415,6 +449,10 @@ const sunscorch: LevelDefinition = {
     { id: "d16", x: 10950, y: 400 }, { id: "d17", x: 11600, y: 350 }, { id: "d18", x: 12100, y: 420 },
   ],
   hiddenCollectibles: [{ id: "dune-hidden", x: 10300, y: 205 }],
+  flightZones: [
+    { id: "dune-gap-one", startX: 3760, endX: 4420 },
+    { id: "dune-gap-two", startX: 7850, endX: 8580 },
+  ],
   checkpoints: [
     { id: "dune-cp0", x: -120, y: BASELINE - 60 }, { id: "dune-cp1", x: 3000, y: BASELINE - 60 },
     { id: "dune-cp2", x: 6400, y: BASELINE - 60 }, { id: "dune-cp3", x: 9200, y: BASELINE - 60 },
@@ -434,16 +472,16 @@ const sunscorch: LevelDefinition = {
 const frostpeakGround: Point[][] = [
   [...flat(-200, 700, BASELINE), ...ramp(700, BASELINE, 1420, BASELINE - 210, 24)],
   [...ramp(1840, BASELINE - 210, 2500, BASELINE - 20, 24), ...rollingTerrain(2500, 4700, BASELINE - 20, [
-    { amplitude: 70, wavelength: 1080, phase: 240 },
-    { amplitude: 28, wavelength: 360, phase: 80 },
+    { amplitude: 50, wavelength: 1300, phase: 240 },
+    { amplitude: 20, wavelength: 500, phase: 80 },
   ])],
   [...rollingTerrain(5200, 7900, BASELINE + 10, [
     { amplitude: 50, wavelength: 1450, phase: 20 },
-    { amplitude: 28, wavelength: 460, phase: 200 },
+    { amplitude: 24, wavelength: 520, phase: 200 },
   ]), ...ramp(7900, BASELINE + 10, 8750, BASELINE - 235, 24)],
   [...ramp(9050, BASELINE - 235, 9750, BASELINE + 18, 24), ...rollingTerrain(9750, 12400, BASELINE + 18, [
-    { amplitude: 75, wavelength: 1180, phase: 400 },
-    { amplitude: 32, wavelength: 390, phase: 90 },
+    { amplitude: 54, wavelength: 1500, phase: 400 },
+    { amplitude: 20, wavelength: 560, phase: 90 },
   ])],
   [...ramp(12850, BASELINE + 10, 13550, BASELINE - 190, 24), ...flat(13550, 15100, BASELINE - 190)],
 ];
@@ -460,9 +498,12 @@ const frostpeak: LevelDefinition = {
   },
   groundPolylines: frostpeakGround,
   platforms: [
+    { x: 1500, y: 475, w: 150, h: 20 }, { x: 1680, y: 440, w: 150, h: 20 },
     { x: 4560, y: 430, w: 160, h: 20 }, { x: 4820, y: 370, w: 160, h: 20 },
     { x: 5080, y: 430, w: 160, h: 20 }, { x: 11950, y: 420, w: 180, h: 20 },
-    { x: 12220, y: 350, w: 180, h: 20 },
+    { x: 12220, y: 350, w: 180, h: 20 }, { x: 12490, y: 430, w: 170, h: 20 },
+    { x: 12880, y: 430, w: 170, h: 20 }, { x: 8740, y: 440, w: 140, h: 20 },
+    { x: 8920, y: 405, w: 140, h: 20 },
   ],
   hazards: [
     { x: 1420, y: 700, w: 420, h: 80 }, { x: 4700, y: 700, w: 500, h: 80 },
@@ -483,6 +524,12 @@ const frostpeak: LevelDefinition = {
     { id: "f19", x: 14000, y: 340 }, { id: "f20", x: 14700, y: 340 },
   ],
   hiddenCollectibles: [{ id: "frost-hidden", x: 10900, y: 145 }],
+  flightZones: [
+    { id: "frost-gap-one", startX: 1330, endX: 1920 },
+    { id: "frost-gap-two", startX: 4620, endX: 5290 },
+    { id: "frost-gap-three", startX: 7840, endX: 9120 },
+    { id: "frost-gap-four", startX: 12280, endX: 13000 },
+  ],
   checkpoints: [
     { id: "frost-cp0", x: -120, y: BASELINE - 60 }, { id: "frost-cp1", x: 3150, y: BASELINE - 60 },
     { id: "frost-cp2", x: 6300, y: BASELINE - 60 }, { id: "frost-cp3", x: 10150, y: BASELINE - 60 },
@@ -500,10 +547,50 @@ const frostpeak: LevelDefinition = {
   ],
 };
 
-const stretchedHollow = stretchLevel(hollow, 1.6);
-const stretchedCanopy = stretchLevel(canopy, 2.1);
+function surfaceYAt(level: LevelDefinition, x: number): number {
+  let closest = { distance: Number.POSITIVE_INFINITY, y: BASELINE };
+  for (const chain of level.groundPolylines) {
+    for (let index = 0; index < chain.length - 1; index++) {
+      const a = chain[index];
+      const b = chain[index + 1];
+      const minX = Math.min(a.x, b.x);
+      const maxX = Math.max(a.x, b.x);
+      if (x >= minX && x <= maxX) {
+        const t = (x - a.x) / (b.x - a.x || 1);
+        return a.y + (b.y - a.y) * t;
+      }
+      for (const point of [a, b]) {
+        const distance = Math.abs(point.x - x);
+        if (distance < closest.distance) closest = { distance, y: point.y };
+      }
+    }
+  }
+  return closest.y;
+}
 
-export const LEVELS: LevelDefinition[] = [garden, stretchedHollow, stretchedCanopy, sunscorch, frostpeak];
+function alignLevelSpawns(level: LevelDefinition): LevelDefinition {
+  const collectibles = level.collectibles.map((collectible) => {
+    const terrainY = surfaceYAt(level, collectible.x);
+    const platformY = level.platforms
+      .filter((platform) => collectible.x >= platform.x && collectible.x <= platform.x + platform.w)
+      .map((platform) => platform.y)
+      .filter((y) => y >= collectible.y && y < terrainY)
+      .sort((a, b) => a - b)[0];
+    const supportY = platformY ?? terrainY;
+    return { ...collectible, y: supportY - 38 };
+  });
+  return {
+    ...level,
+    collectibles,
+    startPosition: { ...level.startPosition, y: surfaceYAt(level, level.startPosition.x) - 34 },
+    checkpoints: level.checkpoints.map((checkpoint) => ({
+      ...checkpoint,
+      y: surfaceYAt(level, checkpoint.x) - 24,
+    })),
+  };
+}
+
+export const LEVELS: LevelDefinition[] = [garden, hollow, canopy, sunscorch, frostpeak].map(alignLevelSpawns);
 export const FIRST_LEVEL_ID = garden.id;
 
 export function getLevelById(id: string): LevelDefinition {

@@ -2,6 +2,8 @@ import type { ColorScheme, MovementForm } from "../types";
 
 export interface ShiftlingDrawState {
   form: MovementForm;
+  vehicleId: string;
+  wheelRadius: number;
   angle: number;
   facing: 1 | -1;
   squash: number;
@@ -69,8 +71,8 @@ export function drawShiftling(
   wheelFront: WheelDraw | null
 ) {
   // wheels drawn first (behind body) when present
-  if (wheelBack) drawWheel(ctx, wheelBack, colors, 15);
-  if (wheelFront) drawWheel(ctx, wheelFront, colors, 15);
+  if (wheelBack) drawWheel(ctx, wheelBack, colors, state.wheelRadius);
+  if (wheelFront) drawWheel(ctx, wheelFront, colors, state.wheelRadius);
 
   ctx.save();
   ctx.translate(x, y);
@@ -116,11 +118,30 @@ export function drawShiftling(
 
   // body pod
   ctx.fillStyle = colors.primary;
-  roundedRect(ctx, 58, 30, 14);
+  const bodyWidth = state.vehicleId === "bumble" ? 64 : state.vehicleId === "cloudhopper" ? 54 : 58;
+  const bodyHeight = state.vehicleId === "bumble" ? 32 : state.vehicleId === "cloudhopper" ? 28 : 30;
+  roundedRect(ctx, bodyWidth, bodyHeight, bodyHeight / 2);
   ctx.fill();
   ctx.strokeStyle = shade(colors.primary, -25);
   ctx.lineWidth = 2.5;
   ctx.stroke();
+
+  if (state.vehicleId === "bumble") {
+    ctx.strokeStyle = colors.accent;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-25, -8);
+    ctx.lineTo(-33, -12);
+    ctx.moveTo(-25, 8);
+    ctx.lineTo(-33, 12);
+    ctx.stroke();
+  } else if (state.vehicleId === "cloudhopper") {
+    ctx.fillStyle = colors.accent;
+    ctx.beginPath();
+    ctx.arc(-20, -12, 3, 0, Math.PI * 2);
+    ctx.arc(-10, -15, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // belly stripe
   ctx.fillStyle = colors.secondary;

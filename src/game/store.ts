@@ -3,6 +3,7 @@ import type { GameStatus, HudSnapshot, SaveData } from "./types";
 import { loadSave, writeSave } from "./save";
 import { getColorScheme } from "./colorSchemes";
 import { FIRST_LEVEL_ID, getNextLevel } from "./levelData";
+import { getVehicle, VEHICLES } from "./vehicles";
 
 export interface LevelCompleteStats {
   levelId: string;
@@ -20,9 +21,13 @@ interface StoreState {
   save: SaveData;
   lastRunStats: LevelCompleteStats | null;
   selectedLevelId: string;
+  selectedVehicleId: string;
   runToken: number; // bumped on each (re)start so the canvas remounts the engine cleanly
   setStatus: (s: GameStatus) => void;
   selectLevel: (levelId: string) => void;
+  selectVehicle: (vehicleId: string) => void;
+  purchaseUpgrade: (upgrade: "engine" | "suspension" | "jump") => void;
+  bankEnergy: () => void;
   startGame: (levelId?: string) => void;
   restart: () => void;
   updateHud: (hud: HudSnapshot) => void;
@@ -45,7 +50,8 @@ const initialHud: HudSnapshot = {
   progress: 0,
   grounded: true,
   nearMagnetSurface: false,
-  canGlide: true,
+  magnetAttached: false,
+  canGlide: false,
   message: null,
 };
 
@@ -57,6 +63,7 @@ export const useGameStore = create<StoreState>((set, get) => ({
   save: initialSave,
   lastRunStats: null,
   selectedLevelId: initialSave.selectedLevelId || FIRST_LEVEL_ID,
+  selectedVehicleId: initialSave.selectedVehicleId,
   runToken: 0,
   setStatus: (s) => set({ status: s }),
   selectLevel: (levelId) => {
@@ -64,6 +71,35 @@ export const useGameStore = create<StoreState>((set, get) => ({
     const save = { ...get().save, selectedLevelId: levelId };
     writeSave(save);
     set({ selectedLevelId: levelId, save });
+  },
+  selectVehicle: (vehicleId) => {
+    const save = { ...get().save };
+    const vehicle = getVehicle(vehicleId);
+    if (!VEHICLES.some((candidate) => candidate.id === vehicleId)) return;
+    if (!save.unlockedVehicleIds.includes(vehicleId)) {
+      if (save.totalEnergyBanked < vehicle.cost) return;
+      save.totalEnergyBanked -= vehicle.cost;
+      save.unlockedVehicleIds = [...save.unlockedVehicleIds, vehicleId];
+    }
+    save.selectedVehicleId = vehicleId;
+    writeSave(save);
+    set({ selectedVehicleId: vehicleId, save });
+  },
+  purchaseUpgrade: (upgrade) => {
+    const save = { ...get().save, vehicleUpgrades: { ...get().save.vehicleUpgrades } };
+    const currentLevel = save.vehicleUpgrades[upgrade];
+    if (currentLevel >= 5) return;
+    const cost = 15 + currentLevel * 12;
+    if (save.totalEnergyBanked < cost) return;
+    save.totalEnergyBanked -= cost;
+    save.vehicleUpgrades[upgrade] = currentLevel + 1;
+    writeSave(save);
+    set({ save });
+  },
+  bankEnergy: () => {
+    const save = { ...get().save, totalEnergyBanked: get().save.totalEnergyBanked + 1 };
+    writeSave(save);
+    set({ save });
   },
   startGame: (levelId) => {
     const selectedLevelId = levelId ?? get().selectedLevelId;
@@ -86,7 +122,6 @@ export const useGameStore = create<StoreState>((set, get) => ({
     const isNewBest = previousLevelBest === null || previousLevelBest === undefined || stats.timeMs < previousLevelBest;
     if (save.bestTimeMs === null || stats.timeMs < save.bestTimeMs) save.bestTimeMs = stats.timeMs;
     save.bestEnergy = Math.max(save.bestEnergy, stats.energy);
-    save.totalEnergyBanked += stats.energy;
     save.levelCompletedOnce = true;
     save.bestTimes = {
       ...save.bestTimes,

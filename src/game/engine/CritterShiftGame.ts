@@ -7,18 +7,19 @@ import { renderLevel } from "./renderLevel";
 import { ParticleSystem } from "./particles";
 import { audio } from "./audio";
 import type { LevelDefinition } from "../levelData";
-import type { ColorScheme, HudSnapshot, MovementForm } from "../types";
+import type { VehicleDefinition } from "../vehicles";
+import type { ColorScheme, HudSnapshot } from "../types";
 
 const { Engine, World, Events } = Matter;
+const HUD_UPDATE_INTERVAL = 1 / 12;
 
 export interface CritterShiftCallbacks {
   onHud: (hud: HudSnapshot) => void;
   onComplete: (stats: { levelId: string; timeMs: number; energy: number; totalEnergy: number; hidden: number; totalHidden: number }) => void;
+  onEnergyCollected: () => void;
 }
 
 const FIXED_DT = 1 / 60;
-const FORM_ORDER: MovementForm[] = ["roll", "glide", "magnet"];
-
 export class CritterShiftGame {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -50,10 +51,13 @@ export class CritterShiftGame {
   private levelComplete = false;
   private respawnCooldown = 0;
   private dustTimer = 0;
+  private hudUpdateAccumulator = 0;
 
   private keys = {
     left: false,
     right: false,
+    up: false,
+    down: false,
     jump: false,
   };
   private pendingJump = false;
@@ -65,7 +69,14 @@ export class CritterShiftGame {
   private keydownHandler = (e: KeyboardEvent) => this.onKeyDown(e);
   private keyupHandler = (e: KeyboardEvent) => this.onKeyUp(e);
 
-  constructor(canvas: HTMLCanvasElement, colors: ColorScheme, level: LevelDefinition, callbacks: CritterShiftCallbacks) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    colors: ColorScheme,
+    level: LevelDefinition,
+    vehicle: VehicleDefinition,
+    upgrades: { engine: number; suspension: number; jump: number },
+    callbacks: CritterShiftCallbacks
+  ) {
     this.canvas = canvas;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("2D canvas context unavailable");
@@ -83,20 +94,33 @@ export class CritterShiftGame {
     this.engine = Engine.create();
     this.engine.gravity.y = 1;
     this.engine.gravity.scale = 0.001;
+    this.engine.positionIterations = 6;
+    this.engine.velocityIterations = 4;
 
     this.world = buildWorld(level);
     World.add(this.engine.world, [...this.world.staticBodies, ...this.world.sensorBodies]);
 
-    this.player = new ShiftlingPlayer(this.engine.world, this.engine, level.startPosition.x, level.startPosition.y, colors, {
-      onLand: (impact) => {
-        audio.play("land");
-        if (impact > 0.3) this.particles.spawnBurst(this.player.position.x, this.player.position.y + 14, "#f2e9d8", 6, { gravity: 0.3 });
-      },
-      onJump: () => audio.play("jump"),
-      onFormChange: () => audio.play("transform"),
-      onMagnetAttach: () => audio.play("magnetAttach"),
-      onMagnetDetach: () => audio.play("magnetDetach"),
-    });
+    this.player = new ShiftlingPlayer(
+      this.engine.world,
+      this.engine,
+      level.startPosition.x,
+      level.startPosition.y,
+      colors,
+      vehicle,
+      upgrades,
+      {
+        onLand: (impact) => {
+          audio.play("land");
+          if (impact > 0.3) {
+            this.particles.spawnBurst(this.player.position.x, this.player.position.y + 14, "#f2e9d8", 6, { gravity: 0.3 });
+          }
+        },
+        onJump: () => audio.play("jump"),
+        onFormChange: () => audio.play("transform"),
+        onMagnetAttach: () => audio.play("magnetAttach"),
+        onMagnetDetach: () => audio.play("magnetDetach"),
+      }
+    );
 
     this.setupCollisions();
     window.addEventListener("keydown", this.keydownHandler);
@@ -132,7 +156,7 @@ export class CritterShiftGame {
     this.lastTime = performance.now();
   }
 
-  setControl(control: "left" | "right" | "jump", active: boolean) {
+  setControl(control: "left" | "right" | "up" | "down" | "jump", active: boolean) {
     if (control === "jump" && active && !this.keys.jump) this.pendingJump = true;
     this.keys[control] = active;
   }
@@ -163,6 +187,16 @@ export class CritterShiftGame {
         this.keys.right = true;
         e.preventDefault();
         break;
+      case "ArrowUp":
+      case "KeyW":
+        this.keys.up = true;
+        e.preventDefault();
+        break;
+      case "ArrowDown":
+      case "KeyS":
+        this.keys.down = true;
+        e.preventDefault();
+        break;
       case "Space":
         if (!this.keys.jump) this.pendingJump = true;
         this.keys.jump = true;
@@ -189,6 +223,14 @@ export class CritterShiftGame {
       case "KeyD":
         this.keys.right = false;
         break;
+      case "ArrowUp":
+      case "KeyW":
+        this.keys.up = false;
+        break;
+      case "ArrowDown":
+      case "KeyS":
+        this.keys.down = false;
+        break;
       case "Space":
         this.keys.jump = false;
         break;
@@ -210,8 +252,9 @@ export class CritterShiftGame {
     });
     Events.on(this.engine, "collisionActive", (evt) => {
       for (const pair of evt.pairs) {
-        this.handleActivePair(pair.bodyA, pair.bodyB);
-        this.handleActivePair(pair.bodyB, pair.bodyA);
+        const normalY = pair.collision.normal.y;
+        this.handleActivePair(pair.bodyA, pair.bodyB, normalY);
+        this.handleActivePair(pair.bodyB, pair.bodyA, -normalY);
       }
     });
     Events.on(this.engine, "collisionEnd", (evt) => {
@@ -231,6 +274,7 @@ export class CritterShiftGame {
         this.collected.add(id);
         audio.play("collect");
         this.particles.spawnBurst(b.position.x, b.position.y, "#ffd23f", 10);
+        this.callbacks.onEnergyCollected();
       }
     } else if (label.startsWith("hidden:")) {
       const id = label.split(":")[1];
@@ -255,10 +299,10 @@ export class CritterShiftGame {
     }
   }
 
-  private handleActivePair(a: Matter.Body, b: Matter.Body) {
+  private handleActivePair(a: Matter.Body, b: Matter.Body, normalY: number) {
     if (!this.isPlayerBody(a)) return;
     if (b.label === "ground" || b.label === "platform" || b.label === "magnet-surface") {
-      this.player.markGroundContact();
+      this.player.markGroundContact(normalY);
     } else if (b.label.startsWith("magnet-zone:")) {
       const id = b.label.split(":")[1];
       this.player.setNearMagnetZone(id, true);
@@ -318,6 +362,7 @@ export class CritterShiftGame {
         this.accumulator -= FIXED_DT;
         steps++;
       }
+      if (this.accumulator >= FIXED_DT) this.accumulator %= FIXED_DT;
     }
     this.timeSec += dtMs / 1000;
     this.render();
@@ -331,6 +376,8 @@ export class CritterShiftGame {
     const input: InputState = {
       left: this.keys.left,
       right: this.keys.right,
+      up: this.keys.up,
+      down: this.keys.down,
       jumpHeld: this.keys.jump,
       jumpPressed: this.pendingJump,
       formPressed: this.pendingForm,
@@ -339,9 +386,17 @@ export class CritterShiftGame {
     this.pendingJump = false;
 
     if (this.pendingForm) {
-      const idx = FORM_ORDER.indexOf(this.player.form);
-      const next = FORM_ORDER[(idx + 1) % FORM_ORDER.length];
-      this.player.switchForm(next, this.world.magnetSurfaces);
+      const nearMagnet = this.player.nearMagnetZones.size > 0;
+      const flightZone = this.level.flightZones.some(
+        (zone) => this.player.position.x >= zone.startX && this.player.position.x <= zone.endX
+      );
+      if (this.player.form === "magnet" || this.player.form === "glide") {
+        this.player.switchForm("roll", this.world.magnetSurfaces);
+      } else if (nearMagnet) {
+        this.player.switchForm("magnet", this.world.magnetSurfaces);
+      } else if (flightZone) {
+        this.player.switchForm("glide", this.world.magnetSurfaces, true);
+      }
       this.pendingForm = false;
     }
     if (this.pendingRecover) {
@@ -350,6 +405,12 @@ export class CritterShiftGame {
     }
 
     this.player.update(dt, input, this.world.magnetSurfaces);
+    const glideFlightZone = this.level.flightZones.find(
+      (zone) => this.player.position.x >= zone.startX && this.player.position.x <= zone.endX + 80
+    );
+    if (this.player.form === "glide" && (!glideFlightZone || this.player.position.x > glideFlightZone.endX)) {
+      this.player.switchForm("roll", this.world.magnetSurfaces);
+    }
 
     // dust while rolling fast on the ground
     this.dustTimer -= dt;
@@ -370,16 +431,23 @@ export class CritterShiftGame {
     this.camX += (targetX - this.camX) * Math.min(1, dt * 3.5);
     this.camY += (targetY - this.camY) * Math.min(1, dt * 3.5);
 
-    this.emitHud();
+    this.hudUpdateAccumulator += dt;
+    if (this.hudUpdateAccumulator >= HUD_UPDATE_INTERVAL) {
+      this.hudUpdateAccumulator %= HUD_UPDATE_INTERVAL;
+      this.emitHud();
+    }
   }
 
   private emitHud() {
     const nearMagnet = this.player.nearMagnetZones.size > 0;
+    const flightZone = this.level.flightZones.find(
+      (zone) => this.player.position.x >= zone.startX && this.player.position.x <= zone.endX
+    );
     let message: string | null = null;
     if (nearMagnet && this.player.form !== "magnet") message = "Press Q to switch to MAGNET near this surface!";
-    else if (this.player.form === "glide") message = "A/D to steer • Hold Space to flap";
-    else if (this.player.form === "magnet" && this.player.attachedSurface) message = "A/D to slide • Space to detach";
-    else if (this.player.form === "roll" && !this.player.grounded && this.player.airTime > 0.6) message = "Press Q to GLIDE across gaps!";
+    else if (this.player.form === "glide") message = "Hold Space to flap across the gap";
+    else if (this.player.form === "magnet" && this.player.attachedSurface) message = "Use ↑ ↓ ← → to choose a rail • Space to detach";
+    else if (flightZone && this.player.form === "roll") message = "Obstacle flight zone · press Q to deploy wings, hold Space to flap";
 
     this.callbacks.onHud({
       form: this.player.form,
@@ -397,7 +465,8 @@ export class CritterShiftGame {
       ),
       grounded: this.player.grounded,
       nearMagnetSurface: nearMagnet,
-      canGlide: true,
+      canGlide: Boolean(flightZone),
+      magnetAttached: Boolean(this.player.attachedSurface),
       message,
     });
   }
@@ -438,6 +507,8 @@ export class CritterShiftGame {
       this.player.colors,
       {
         form: this.player.form,
+        vehicleId: this.player.vehicle.id,
+        wheelRadius: this.player.vehicle.wheelRadius,
         angle: this.player.chassis.angle,
         facing: this.player.facing,
         squash: this.player.squash,

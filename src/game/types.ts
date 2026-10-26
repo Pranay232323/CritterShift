@@ -28,6 +28,13 @@ export interface SaveData {
   unlockedLevelIds: string[];
   selectedLevelId: string;
   bestTimes: Record<string, number>;
+  unlockedVehicleIds: string[];
+  selectedVehicleId: string;
+  vehicleUpgrades: {
+    engine: number;
+    suspension: number;
+    jump: number;
+  };
   muted: boolean;
 }
 
@@ -42,6 +49,7 @@ export interface HudSnapshot {
   progress: number;
   grounded: boolean;
   nearMagnetSurface: boolean;
+  magnetAttached: boolean;
   canGlide: boolean;
   message: string | null;
 }
