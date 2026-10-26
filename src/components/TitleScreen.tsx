@@ -15,7 +15,7 @@ export default function TitleScreen() {
 
   return (
     <div
-      className="relative flex min-h-screen w-full flex-col items-center justify-between overflow-hidden bg-cover bg-center px-4 py-8"
+      className="relative flex min-h-screen w-full flex-col items-center justify-between overflow-x-hidden bg-cover bg-center px-4 py-6 sm:py-8"
       style={{ backgroundImage: "url(/images/title-hero.jpg)" }}
     >
       <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-black/70" />
@@ -33,8 +33,8 @@ export default function TitleScreen() {
         <p className="text-lg font-semibold tracking-[0.4em] text-white/90 sm:text-xl">WILDWHEEL WORLDS</p>
       </div>
 
-      <div className="relative z-10 flex w-full max-w-md flex-col items-center gap-4">
-        <div className="grid w-full grid-cols-3 gap-2">
+      <div className="relative z-10 flex w-full max-w-2xl flex-col items-center gap-4">
+        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-5">
           {LEVELS.map((level, index) => {
             const unlocked = save.unlockedLevelIds.includes(level.id);
             const selected = selectedLevelId === level.id;
@@ -46,7 +46,7 @@ export default function TitleScreen() {
                   audio.play("click");
                   selectLevel(level.id);
                 }}
-                className={`rounded-xl px-3 py-2 text-left ring-1 transition ${
+                className={`min-h-16 rounded-xl px-3 py-2 text-left ring-1 transition ${
                   selected
                     ? "bg-amber-300/90 text-amber-950 ring-amber-100"
                     : unlocked
@@ -58,6 +58,9 @@ export default function TitleScreen() {
                   {unlocked ? `World ${index + 1}` : "Locked"}
                 </span>
                 <span className="block text-sm font-extrabold leading-tight">{level.name}</span>
+                <span className="mt-1 block text-[10px] font-semibold opacity-75">
+                  {Math.round((level.finish.x - level.startPosition.x) / 1000)} km journey
+                </span>
               </button>
             );
           })}

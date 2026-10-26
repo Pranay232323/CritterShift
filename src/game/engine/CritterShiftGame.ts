@@ -132,6 +132,16 @@ export class CritterShiftGame {
     this.lastTime = performance.now();
   }
 
+  setControl(control: "left" | "right" | "jump", active: boolean) {
+    if (control === "jump" && active && !this.keys.jump) this.pendingJump = true;
+    this.keys[control] = active;
+  }
+
+  triggerAction(action: "form" | "recover") {
+    if (action === "form") this.pendingForm = true;
+    else this.pendingRecover = true;
+  }
+
   destroy() {
     this.running = false;
     cancelAnimationFrame(this.rafId);
@@ -379,6 +389,12 @@ export class CritterShiftGame {
       totalHidden: this.level.hiddenCollectibles.length,
       elapsedMs: this.elapsedMs,
       speedKph: this.player.speedKph(),
+      progress: Matter.Common.clamp(
+        (this.player.position.x - this.level.startPosition.x) /
+          (this.level.finish.x - this.level.startPosition.x),
+        0,
+        1
+      ),
       grounded: this.player.grounded,
       nearMagnetSurface: nearMagnet,
       canGlide: true,

@@ -38,10 +38,77 @@ export function drawBackground(
 
   drawCloudLayer(ctx, width, camX * 0.05, 90, 0.00022, 50, 10);
   drawCloudLayer(ctx, width, camX * 0.09, 160, 0.00028, 60, 16);
-  drawFarGears(ctx, width, height, camX * 0.18, camY * 0.1, timeSec);
-  drawGiantFlowers(ctx, width, height, camX * 0.35, camY * 0.2, timeSec, theme.flowerHue);
+  if (theme.scenery === "garden" || theme.scenery === "canopy") {
+    drawFarGears(ctx, width, height, camX * 0.18, camY * 0.1, timeSec);
+  }
+  if (theme.scenery === "desert") {
+    drawDesertPlants(ctx, width, height, camX * 0.35, camY * 0.2);
+  } else if (theme.scenery === "alpine") {
+    drawMountainPeaks(ctx, width, height, camX * 0.3, camY * 0.18);
+  } else {
+    drawGiantFlowers(ctx, width, height, camX * 0.35, camY * 0.2, timeSec, theme.flowerHue);
+  }
   drawHillSilhouette(ctx, width, height, camX * 0.55, camY * 0.3, theme.farHills);
   drawHillSilhouette(ctx, width, height, camX * 0.72, camY * 0.4, theme.nearHills);
+}
+
+function drawDesertPlants(ctx: CanvasRenderingContext2D, width: number, height: number, offsetX: number, offsetY: number) {
+  const spacing = 460;
+  const start = Math.floor((offsetX - width) / spacing) - 1;
+  const end = Math.floor((offsetX + width * 2) / spacing) + 1;
+  ctx.save();
+  ctx.strokeStyle = "#54784a";
+  ctx.lineCap = "round";
+  ctx.lineWidth = 7;
+  for (let i = start; i <= end; i++) {
+    const seed = hash(i * 5.71);
+    if (seed < 0.42) continue;
+    const x = i * spacing - offsetX + seed * 90;
+    if (x < -70 || x > width + 70) continue;
+    const baseY = height * 0.73 - offsetY;
+    const stemHeight = 34 + seed * 34;
+    ctx.beginPath();
+    ctx.moveTo(x, baseY);
+    ctx.lineTo(x, baseY - stemHeight);
+    ctx.moveTo(x, baseY - stemHeight * 0.58);
+    ctx.lineTo(x - 12, baseY - stemHeight * 0.58);
+    ctx.lineTo(x - 12, baseY - stemHeight * 0.82);
+    ctx.moveTo(x, baseY - stemHeight * 0.42);
+    ctx.lineTo(x + 13, baseY - stemHeight * 0.42);
+    ctx.lineTo(x + 13, baseY - stemHeight * 0.68);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawMountainPeaks(ctx: CanvasRenderingContext2D, width: number, height: number, offsetX: number, offsetY: number) {
+  const spacing = 330;
+  const start = Math.floor((offsetX - width) / spacing) - 1;
+  const end = Math.floor((offsetX + width * 2) / spacing) + 1;
+  ctx.save();
+  for (let i = start; i <= end; i++) {
+    const seed = hash(i * 8.23);
+    const x = i * spacing - offsetX;
+    const baseY = height * 0.76 - offsetY;
+    const peakY = baseY - 110 - seed * 120;
+    const peakX = x + spacing * (0.35 + seed * 0.3);
+    ctx.fillStyle = seed > 0.5 ? "#b6d5e8aa" : "#c8e1eeaa";
+    ctx.beginPath();
+    ctx.moveTo(x - spacing * 0.25, baseY);
+    ctx.lineTo(peakX, peakY);
+    ctx.lineTo(x + spacing * 1.15, baseY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#f6fcffdd";
+    ctx.beginPath();
+    ctx.moveTo(peakX, peakY);
+    ctx.lineTo(peakX - 28, peakY + 48);
+    ctx.lineTo(peakX - 4, peakY + 37);
+    ctx.lineTo(peakX + 20, peakY + 54);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function drawCloudLayer(

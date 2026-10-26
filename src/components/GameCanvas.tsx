@@ -77,7 +77,12 @@ export default function GameCanvas() {
   return (
     <div ref={containerRef} className="relative h-screen w-full overflow-hidden bg-sky-200">
       <canvas ref={canvasRef} className="block h-full w-full" />
-      <HUD onPause={() => setStatus("paused")} levelName={getLevelById(selectedLevelId).name} />
+      <HUD
+        onPause={() => setStatus("paused")}
+        levelName={getLevelById(selectedLevelId).name}
+        onControl={(control, active) => gameRef.current?.setControl(control, active)}
+        onAction={(action) => gameRef.current?.triggerAction(action)}
+      />
       {status === "paused" && (
         <PauseMenu
           onResume={() => setStatus("playing")}

@@ -277,11 +277,11 @@ export class ShiftlingPlayer {
     }
     if (!this.grounded) this.airTime += dtSec;
 
-    const maxW = 0.85;
+    const steer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    const maxW = 0.85 + Math.min(0.3, Math.abs(this.chassis.velocity.x) * 0.025);
     let targetW = 0;
-    if (input.right) targetW = maxW;
-    if (input.left) targetW = -maxW;
-    const accelRate = targetW !== 0 ? 0.22 : 0.12; // how quickly wheel spin approaches target each step
+    if (steer !== 0) targetW = steer * maxW;
+    const accelRate = targetW !== 0 ? 0.22 : 0.12;
 
     for (const wheel of [this.wheelBack, this.wheelFront]) {
       if (!wheel) continue;
@@ -289,10 +289,15 @@ export class ShiftlingPlayer {
       Body.setAngularVelocity(wheel, newW);
     }
 
-    // slight airborne tilt control for stable landings
+    const horizontalDrive = steer * (this.grounded ? 0.055 : 0.025);
+    const horizontalSpeed = Matter.Common.clamp(this.chassis.velocity.x + horizontalDrive, -12.5, 12.5);
+    Body.setVelocity(this.chassis, { x: horizontalSpeed, y: this.chassis.velocity.y });
+    if (this.wheelBack) Body.setVelocity(this.wheelBack, { x: horizontalSpeed, y: this.wheelBack.velocity.y });
+    if (this.wheelFront) Body.setVelocity(this.wheelFront, { x: horizontalSpeed, y: this.wheelFront.velocity.y });
+
+    // Give the player a small air-roll correction for cleaner landings.
     if (!this.grounded) {
-      const airControl = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-      Body.setAngularVelocity(this.chassis, this.chassis.angularVelocity + airControl * 0.012);
+      Body.setAngularVelocity(this.chassis, Matter.Common.clamp(this.chassis.angularVelocity * 0.96 + steer * 0.012, -0.18, 0.18));
     }
 
     if (this.jumpBufferTimer > 0 && this.grounded) {
@@ -321,12 +326,12 @@ export class ShiftlingPlayer {
     this.wingT = Math.min(1, this.wingT + dtSec * 4);
 
     const steer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    let vx = this.chassis.velocity.x + steer * 0.16;
-    vx = Matter.Common.clamp(vx, -9, 9);
+    const vx = Matter.Common.clamp(this.chassis.velocity.x + steer * 0.11, -10, 10);
 
     let vy = this.chassis.velocity.y;
-    if (input.jumpHeld) vy -= 0.4; // sustained flapping trades speed for lift
-    vy = Matter.Common.clamp(vy, -6.5, 7); // terminal fall speed while gliding
+    if (input.jumpPressed) vy -= 0.7;
+    else if (input.jumpHeld) vy -= 0.12;
+    vy = Matter.Common.clamp(vy, -5.5, 6.5);
 
     Body.setVelocity(this.chassis, { x: vx, y: vy });
 

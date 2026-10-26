@@ -42,6 +42,7 @@ const initialHud: HudSnapshot = {
   totalHidden: 0,
   elapsedMs: 0,
   speedKph: 0,
+  progress: 0,
   grounded: true,
   nearMagnetSurface: false,
   canGlide: true,

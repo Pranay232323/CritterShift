@@ -39,6 +39,7 @@ export interface HudSnapshot {
   totalHidden: number;
   elapsedMs: number;
   speedKph: number;
+  progress: number;
   grounded: boolean;
   nearMagnetSurface: boolean;
   canGlide: boolean;

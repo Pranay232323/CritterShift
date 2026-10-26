@@ -54,11 +54,11 @@ export function renderLevel(
   for (const p of level.platforms) {
     const x = toX(p.x);
     const y = toY(p.y);
-    ctx.fillStyle = "#b98652";
+    ctx.fillStyle = level.groundBottom;
     ctx.fillRect(x, y, p.w, p.h);
-    ctx.fillStyle = "#5fbf5f";
+    ctx.fillStyle = level.groundTop;
     ctx.fillRect(x, y - 4, p.w, 6);
-    ctx.strokeStyle = "#6e4730";
+    ctx.strokeStyle = lighten(level.groundBottom);
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, p.w, p.h);
   }

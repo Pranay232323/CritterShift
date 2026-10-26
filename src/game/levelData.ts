@@ -40,6 +40,7 @@ export interface LevelDefinition {
   groundTop: string;
   groundBottom: string;
   background: {
+    scenery: "garden" | "hollow" | "canopy" | "desert" | "alpine";
     skyTop: string;
     skyMiddle: string;
     skyBottom: string;
@@ -92,6 +93,55 @@ function ramp(x1: number, y1: number, x2: number, y2: number, step = 30): Point[
     pts.push({ x: x1 + (x2 - x1) * t, y: y1 + (y2 - y1) * t });
   }
   return pts;
+}
+
+function rollingTerrain(
+  startX: number,
+  endX: number,
+  baseY: number,
+  waves: { amplitude: number; wavelength: number; phase: number }[],
+  step = 32
+): Point[] {
+  const waveHeight = (x: number) => waves.reduce(
+    (sum, wave) => sum + wave.amplitude * Math.sin(((x + wave.phase) / wave.wavelength) * Math.PI * 2),
+    0
+  );
+  const startHeight = waveHeight(startX);
+  const endHeight = waveHeight(endX);
+  const points: Point[] = [];
+  for (let x = startX; x <= endX; x += step) {
+    const progress = (x - startX) / (endX - startX);
+    const baselineWave = startHeight + (endHeight - startHeight) * progress;
+    const y = baseY - (waveHeight(x) - baselineWave);
+    points.push({ x, y });
+  }
+  if (!points.length || points[points.length - 1].x !== endX) {
+    points.push({ x: endX, y: baseY });
+  }
+  return points;
+}
+
+function stretchLevel(level: LevelDefinition, factor: number): LevelDefinition {
+  const scalePoint = (point: Point): Point => ({ ...point, x: point.x * factor });
+  return {
+    ...level,
+    groundPolylines: level.groundPolylines.map((chain) => chain.map(scalePoint)),
+    platforms: level.platforms.map((platform) => ({ ...platform, x: platform.x * factor, w: platform.w * factor })),
+    hazards: level.hazards.map((hazard) => ({ ...hazard, x: hazard.x * factor, w: hazard.w * factor })),
+    magnetSegments: level.magnetSegments.map((segment) => ({
+      ...segment,
+      x1: segment.x1 * factor,
+      x2: segment.x2 * factor,
+    })),
+    collectibles: level.collectibles.map((collectible) => ({ ...collectible, ...scalePoint(collectible) })),
+    hiddenCollectibles: level.hiddenCollectibles.map((collectible) => ({ ...collectible, ...scalePoint(collectible) })),
+    checkpoints: level.checkpoints.map((checkpoint) => ({ ...checkpoint, ...scalePoint(checkpoint) })),
+    finish: { ...level.finish, x: level.finish.x * factor, w: level.finish.w * factor },
+    startPosition: scalePoint(level.startPosition),
+    worldMinX: level.worldMinX * factor,
+    worldMaxX: level.worldMaxX * factor,
+    landmarks: level.landmarks.map((landmark) => ({ ...landmark, x: landmark.x * factor })),
+  };
 }
 
 const gardenGround: Point[][] = [
@@ -162,7 +212,7 @@ const gardenHidden: Collectible[] = [
 ];
 
 const gardenCheckpoints: Checkpoint[] = [
-  { id: "cp0", x: -40, y: BASELINE - 60 },
+  { id: "cp0", x: -140, y: BASELINE - 60 },
   { id: "cp1", x: 2420, y: BASELINE - 60 },
   { id: "cp2", x: 3460, y: BASELINE - 60 },
   { id: "cp3", x: 5180, y: BASELINE - 60 },
@@ -175,6 +225,7 @@ const garden: LevelDefinition = {
   groundTop: "#5fbf5f",
   groundBottom: "#4a3220",
   background: {
+    scenery: "garden",
     skyTop: "#bdeaff", skyMiddle: "#d8f3ff", skyBottom: "#eafff1",
     farHills: "#bfe9c9", nearHills: "#a7e0b6", flowerHue: 330,
   },
@@ -211,6 +262,7 @@ const hollow: LevelDefinition = {
   groundTop: "#db7eaa",
   groundBottom: "#56304f",
   background: {
+    scenery: "hollow",
     skyTop: "#f7cce2", skyMiddle: "#fbe4f1", skyBottom: "#fff1dd",
     farHills: "#e9b5c9", nearHills: "#c58caa", flowerHue: 285,
   },
@@ -238,7 +290,7 @@ const hollow: LevelDefinition = {
   ],
   hiddenCollectibles: [{ id: "hollow-hidden", x: 5110, y: 190 }],
   checkpoints: [
-    { id: "hollow-cp0", x: -40, y: 500 },
+    { id: "hollow-cp0", x: -120, y: 500 },
     { id: "hollow-cp1", x: 2040, y: 500 },
     { id: "hollow-cp2", x: 3050, y: 500 },
     { id: "hollow-cp3", x: 4510, y: 500 },
@@ -269,6 +321,7 @@ const canopy: LevelDefinition = {
   groundTop: "#77b8cf",
   groundBottom: "#28465b",
   background: {
+    scenery: "canopy",
     skyTop: "#a9d5eb", skyMiddle: "#d1e7ef", skyBottom: "#e5f3ed",
     farHills: "#a6d2ca", nearHills: "#78aaa9", flowerHue: 190,
   },
@@ -296,7 +349,7 @@ const canopy: LevelDefinition = {
   ],
   hiddenCollectibles: [{ id: "canopy-hidden", x: 4510, y: 170 }],
   checkpoints: [
-    { id: "canopy-cp0", x: -40, y: 500 },
+    { id: "canopy-cp0", x: -120, y: 500 },
     { id: "canopy-cp1", x: 1600, y: 500 },
     { id: "canopy-cp2", x: 2680, y: 500 },
     { id: "canopy-cp3", x: 4310, y: 500 },
@@ -314,7 +367,143 @@ const canopy: LevelDefinition = {
   ],
 };
 
-export const LEVELS: LevelDefinition[] = [garden, hollow, canopy];
+const sunscorchGround: Point[][] = [
+  rollingTerrain(-200, 3900, BASELINE, [
+    { amplitude: 66, wavelength: 1680, phase: 0 },
+    { amplitude: 30, wavelength: 570, phase: 260 },
+  ]),
+  rollingTerrain(4300, 8000, BASELINE + 12, [
+    { amplitude: 82, wavelength: 1480, phase: 600 },
+    { amplitude: 38, wavelength: 460, phase: 100 },
+  ]),
+  rollingTerrain(8500, 12400, BASELINE - 8, [
+    { amplitude: 94, wavelength: 1840, phase: 150 },
+    { amplitude: 42, wavelength: 520, phase: 300 },
+  ]),
+];
+const sunscorch: LevelDefinition = {
+  id: "sunscorch-dunes",
+  name: "Sunscorch Dunes",
+  subtitle: "Surf sweeping sand ridges, cross dry ravines, and chase the sunset.",
+  groundTop: "#e7a54f",
+  groundBottom: "#75452e",
+  background: {
+    scenery: "desert",
+    skyTop: "#f6a969", skyMiddle: "#ffd39a", skyBottom: "#fff0c9",
+    farHills: "#e9b27a", nearHills: "#c98555", flowerHue: 38,
+  },
+  groundPolylines: sunscorchGround,
+  platforms: [
+    { x: 3300, y: 450, w: 150, h: 22 }, { x: 3540, y: 405, w: 150, h: 22 },
+    { x: 3780, y: 450, w: 150, h: 22 }, { x: 7900, y: 430, w: 170, h: 22 },
+    { x: 8150, y: 370, w: 170, h: 22 },
+  ],
+  hazards: [
+    { x: 3880, y: 700, w: 420, h: 80 }, { x: 8000, y: 700, w: 500, h: 80 },
+  ],
+  magnetSegments: [
+    { id: "dune-climb", x1: 10100, y1: 470, x2: 10100, y2: 250 },
+    { id: "dune-arch", x1: 10100, y1: 250, x2: 10500, y2: 250 },
+    { id: "dune-drop", x1: 10500, y1: 250, x2: 10500, y2: 470 },
+  ],
+  collectibles: [
+    { id: "d1", x: 300, y: 455 }, { id: "d2", x: 950, y: 360 }, { id: "d3", x: 1650, y: 480 },
+    { id: "d4", x: 2450, y: 390 }, { id: "d5", x: 3400, y: 410 }, { id: "d6", x: 3650, y: 365 },
+    { id: "d7", x: 4150, y: 430 }, { id: "d8", x: 4900, y: 370 }, { id: "d9", x: 5850, y: 420 },
+    { id: "d10", x: 6900, y: 380 }, { id: "d11", x: 7950, y: 390 }, { id: "d12", x: 8180, y: 330 },
+    { id: "d13", x: 8750, y: 430 }, { id: "d14", x: 9600, y: 330 }, { id: "d15", x: 10300, y: 210 },
+    { id: "d16", x: 10950, y: 400 }, { id: "d17", x: 11600, y: 350 }, { id: "d18", x: 12100, y: 420 },
+  ],
+  hiddenCollectibles: [{ id: "dune-hidden", x: 10300, y: 205 }],
+  checkpoints: [
+    { id: "dune-cp0", x: -120, y: BASELINE - 60 }, { id: "dune-cp1", x: 3000, y: BASELINE - 60 },
+    { id: "dune-cp2", x: 6400, y: BASELINE - 60 }, { id: "dune-cp3", x: 9200, y: BASELINE - 60 },
+  ],
+  finish: { x: 12250, y: BASELINE - 120, w: 80, h: 220 },
+  startPosition: { x: -40, y: BASELINE - 80 },
+  worldMinX: -300,
+  worldMaxX: 12500,
+  deathY: 1150,
+  landmarks: [
+    { x: 1800, y: BASELINE, label: "jump" }, { x: 3950, y: BASELINE, label: "glide" },
+    { x: 8100, y: BASELINE, label: "jump" }, { x: 10100, y: BASELINE, label: "magnet" },
+    { x: 12150, y: BASELINE, label: "finish" },
+  ],
+};
+
+const frostpeakGround: Point[][] = [
+  [...flat(-200, 700, BASELINE), ...ramp(700, BASELINE, 1420, BASELINE - 210, 24)],
+  [...ramp(1840, BASELINE - 210, 2500, BASELINE - 20, 24), ...rollingTerrain(2500, 4700, BASELINE - 20, [
+    { amplitude: 70, wavelength: 1080, phase: 240 },
+    { amplitude: 28, wavelength: 360, phase: 80 },
+  ])],
+  [...rollingTerrain(5200, 7900, BASELINE + 10, [
+    { amplitude: 50, wavelength: 1450, phase: 20 },
+    { amplitude: 28, wavelength: 460, phase: 200 },
+  ]), ...ramp(7900, BASELINE + 10, 8750, BASELINE - 235, 24)],
+  [...ramp(9050, BASELINE - 235, 9750, BASELINE + 18, 24), ...rollingTerrain(9750, 12400, BASELINE + 18, [
+    { amplitude: 75, wavelength: 1180, phase: 400 },
+    { amplitude: 32, wavelength: 390, phase: 90 },
+  ])],
+  [...ramp(12850, BASELINE + 10, 13550, BASELINE - 190, 24), ...flat(13550, 15100, BASELINE - 190)],
+];
+const frostpeak: LevelDefinition = {
+  id: "frostpeak-ridge",
+  name: "Frostpeak Ridge",
+  subtitle: "Climb the high country, master icy drops, and make one last mountain run.",
+  groundTop: "#a8e7f2",
+  groundBottom: "#365878",
+  background: {
+    scenery: "alpine",
+    skyTop: "#9bd2f2", skyMiddle: "#d9f1ff", skyBottom: "#f3fbff",
+    farHills: "#b6d9e8", nearHills: "#86b3cf", flowerHue: 205,
+  },
+  groundPolylines: frostpeakGround,
+  platforms: [
+    { x: 4560, y: 430, w: 160, h: 20 }, { x: 4820, y: 370, w: 160, h: 20 },
+    { x: 5080, y: 430, w: 160, h: 20 }, { x: 11950, y: 420, w: 180, h: 20 },
+    { x: 12220, y: 350, w: 180, h: 20 },
+  ],
+  hazards: [
+    { x: 1420, y: 700, w: 420, h: 80 }, { x: 4700, y: 700, w: 500, h: 80 },
+    { x: 8750, y: 700, w: 300, h: 80 }, { x: 12400, y: 700, w: 450, h: 80 },
+  ],
+  magnetSegments: [
+    { id: "ice-rise", x1: 10700, y1: 440, x2: 10700, y2: 190 },
+    { id: "ice-ceiling", x1: 10700, y1: 190, x2: 11100, y2: 190 },
+    { id: "ice-drop", x1: 11100, y1: 190, x2: 11100, y2: 440 },
+  ],
+  collectibles: [
+    { id: "f1", x: 350, y: 490 }, { id: "f2", x: 1000, y: 370 }, { id: "f3", x: 1580, y: 270 },
+    { id: "f4", x: 2250, y: 420 }, { id: "f5", x: 3100, y: 340 }, { id: "f6", x: 4300, y: 450 },
+    { id: "f7", x: 4800, y: 330 }, { id: "f8", x: 5050, y: 390 }, { id: "f9", x: 5500, y: 420 },
+    { id: "f10", x: 6500, y: 390 }, { id: "f11", x: 7700, y: 390 }, { id: "f12", x: 8360, y: 350 },
+    { id: "f13", x: 8890, y: 260 }, { id: "f14", x: 10200, y: 380 }, { id: "f15", x: 10900, y: 150 },
+    { id: "f16", x: 11700, y: 430 }, { id: "f17", x: 12100, y: 310 }, { id: "f18", x: 12900, y: 400 },
+    { id: "f19", x: 14000, y: 340 }, { id: "f20", x: 14700, y: 340 },
+  ],
+  hiddenCollectibles: [{ id: "frost-hidden", x: 10900, y: 145 }],
+  checkpoints: [
+    { id: "frost-cp0", x: -120, y: BASELINE - 60 }, { id: "frost-cp1", x: 3150, y: BASELINE - 60 },
+    { id: "frost-cp2", x: 6300, y: BASELINE - 60 }, { id: "frost-cp3", x: 10150, y: BASELINE - 60 },
+    { id: "frost-cp4", x: 13700, y: BASELINE - 250 },
+  ],
+  finish: { x: 14950, y: BASELINE - 310, w: 90, h: 240 },
+  startPosition: { x: -40, y: BASELINE - 80 },
+  worldMinX: -300,
+  worldMaxX: 15200,
+  deathY: 1250,
+  landmarks: [
+    { x: 1100, y: BASELINE, label: "jump" }, { x: 4800, y: BASELINE, label: "glide" },
+    { x: 8200, y: BASELINE, label: "jump" }, { x: 10700, y: BASELINE, label: "magnet" },
+    { x: 14850, y: BASELINE - 190, label: "finish" },
+  ],
+};
+
+const stretchedHollow = stretchLevel(hollow, 1.6);
+const stretchedCanopy = stretchLevel(canopy, 2.1);
+
+export const LEVELS: LevelDefinition[] = [garden, stretchedHollow, stretchedCanopy, sunscorch, frostpeak];
 export const FIRST_LEVEL_ID = garden.id;
 
 export function getLevelById(id: string): LevelDefinition {
