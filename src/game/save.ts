@@ -10,6 +10,9 @@ const DEFAULT_SAVE: SaveData = {
   unlockedColors: ["copper"],
   selectedColor: "copper",
   levelCompletedOnce: false,
+  unlockedLevelIds: ["mechanical-garden"],
+  selectedLevelId: "mechanical-garden",
+  bestTimes: {},
   muted: false,
 };
 
@@ -18,7 +21,12 @@ export function loadSave(): SaveData {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...DEFAULT_SAVE };
     const parsed = JSON.parse(raw);
-    return { ...DEFAULT_SAVE, ...parsed };
+    return {
+      ...DEFAULT_SAVE,
+      ...parsed,
+      unlockedLevelIds: Array.isArray(parsed.unlockedLevelIds) ? parsed.unlockedLevelIds : DEFAULT_SAVE.unlockedLevelIds,
+      bestTimes: parsed.bestTimes && typeof parsed.bestTimes === "object" ? parsed.bestTimes : {},
+    };
   } catch {
     return { ...DEFAULT_SAVE };
   }

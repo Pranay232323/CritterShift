@@ -1,6 +1,7 @@
 // Procedurally rendered parallax background for the Mechanical Garden.
 // Deterministic pseudo-random placement keyed off world position so the
 // scenery never jitters or reshuffles between frames.
+import type { LevelDefinition } from "../levelData";
 
 function hash(n: number): number {
   const s = Math.sin(n * 127.1) * 43758.5453123;
@@ -13,13 +14,14 @@ export function drawBackground(
   height: number,
   camX: number,
   camY: number,
-  timeSec: number
+  timeSec: number,
+  theme: LevelDefinition["background"]
 ) {
   // Sky gradient
   const sky = ctx.createLinearGradient(0, 0, 0, height);
-  sky.addColorStop(0, "#bdeaff");
-  sky.addColorStop(0.55, "#d8f3ff");
-  sky.addColorStop(1, "#eafff1");
+  sky.addColorStop(0, theme.skyTop);
+  sky.addColorStop(0.55, theme.skyMiddle);
+  sky.addColorStop(1, theme.skyBottom);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, width, height);
 
@@ -37,9 +39,9 @@ export function drawBackground(
   drawCloudLayer(ctx, width, camX * 0.05, 90, 0.00022, 50, 10);
   drawCloudLayer(ctx, width, camX * 0.09, 160, 0.00028, 60, 16);
   drawFarGears(ctx, width, height, camX * 0.18, camY * 0.1, timeSec);
-  drawGiantFlowers(ctx, width, height, camX * 0.35, camY * 0.2, timeSec);
-  drawHillSilhouette(ctx, width, height, camX * 0.55, camY * 0.3, "#bfe9c9");
-  drawHillSilhouette(ctx, width, height, camX * 0.72, camY * 0.4, "#a7e0b6");
+  drawGiantFlowers(ctx, width, height, camX * 0.35, camY * 0.2, timeSec, theme.flowerHue);
+  drawHillSilhouette(ctx, width, height, camX * 0.55, camY * 0.3, theme.farHills);
+  drawHillSilhouette(ctx, width, height, camX * 0.72, camY * 0.4, theme.nearHills);
 }
 
 function drawCloudLayer(
@@ -106,7 +108,15 @@ function drawGear(ctx: CanvasRenderingContext2D, x: number, y: number, r: number
   ctx.restore();
 }
 
-function drawGiantFlowers(ctx: CanvasRenderingContext2D, width: number, height: number, offsetX: number, offsetY: number, t: number) {
+function drawGiantFlowers(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  offsetX: number,
+  offsetY: number,
+  t: number,
+  flowerHue: number
+) {
   const spacing = 380;
   const start = Math.floor((offsetX - width) / spacing) - 1;
   const end = Math.floor((offsetX + width * 2) / spacing) + 1;
@@ -117,7 +127,7 @@ function drawGiantFlowers(ctx: CanvasRenderingContext2D, width: number, height: 
     const groundY = height * 0.62 - offsetY;
     const stemH = 90 + seed * 90;
     const sway = Math.sin(t * 0.6 + i) * 4;
-    const hue = 330 + seed * 40;
+    const hue = flowerHue + seed * 40;
     ctx.save();
     ctx.strokeStyle = "#6fae6f";
     ctx.lineWidth = 8;

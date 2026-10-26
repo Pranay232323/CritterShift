@@ -6,6 +6,7 @@ import { audio } from "../game/engine/audio";
 import HUD from "./HUD";
 import PauseMenu from "./PauseMenu";
 import LevelCompleteScreen from "./LevelCompleteScreen";
+import { getLevelById } from "../game/levelData";
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -17,6 +18,7 @@ export default function GameCanvas() {
   const updateHud = useGameStore((s) => s.updateHud);
   const completeLevel = useGameStore((s) => s.completeLevel);
   const save = useGameStore((s) => s.save);
+  const selectedLevelId = useGameStore((s) => s.selectedLevelId);
   const restart = useGameStore((s) => s.restart);
 
   // Mount / unmount the physics + render engine exactly once per run.
@@ -26,7 +28,7 @@ export default function GameCanvas() {
     if (!canvas || !container) return;
 
     audio.setMuted(save.muted);
-    const game = new CritterShiftGame(canvas, getColorScheme(save.selectedColor), {
+    const game = new CritterShiftGame(canvas, getColorScheme(save.selectedColor), getLevelById(selectedLevelId), {
       onHud: (hud) => updateHud(hud),
       onComplete: (stats) => {
         completeLevel(stats);
@@ -75,7 +77,7 @@ export default function GameCanvas() {
   return (
     <div ref={containerRef} className="relative h-screen w-full overflow-hidden bg-sky-200">
       <canvas ref={canvasRef} className="block h-full w-full" />
-      <HUD onPause={() => setStatus("paused")} />
+      <HUD onPause={() => setStatus("paused")} levelName={getLevelById(selectedLevelId).name} />
       {status === "paused" && (
         <PauseMenu
           onResume={() => setStatus("playing")}

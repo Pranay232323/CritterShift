@@ -1,16 +1,6 @@
 import Matter from "matter-js";
 import { CAT } from "./categories";
-import {
-  checkpoints,
-  collectibles,
-  finish,
-  groundPolylines,
-  hazards,
-  hiddenCollectibles,
-  magnetSegments,
-  platforms,
-  type MagnetSegment,
-} from "../levelData";
+import type { LevelDefinition, MagnetSegment } from "../levelData";
 
 const { Bodies } = Matter;
 
@@ -59,12 +49,12 @@ function segmentBody(x1: number, y1: number, x2: number, y2: number, thickness: 
   return body;
 }
 
-export function buildWorld(): BuiltWorld {
+export function buildWorld(level: LevelDefinition): BuiltWorld {
   const staticBodies: Matter.Body[] = [];
   const sensorBodies: Matter.Body[] = [];
 
   // Ground chains
-  for (const chain of groundPolylines) {
+  for (const chain of level.groundPolylines) {
     for (let i = 0; i < chain.length - 1; i++) {
       const a = chain[i];
       const b = chain[i + 1];
@@ -73,7 +63,7 @@ export function buildWorld(): BuiltWorld {
   }
 
   // Platforms
-  for (const p of platforms) {
+  for (const p of level.platforms) {
     const body = Bodies.rectangle(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h, {
       isStatic: true,
       angle: p.angle ?? 0,
@@ -87,7 +77,7 @@ export function buildWorld(): BuiltWorld {
 
   // Magnet surfaces: solid thin body + wider sensor detection zone
   const magnetSurfaces: MagnetSurfaceInfo[] = [];
-  for (const seg of magnetSegments as MagnetSegment[]) {
+  for (const seg of level.magnetSegments as MagnetSegment[]) {
     const solid = segmentBody(seg.x1, seg.y1, seg.x2, seg.y2, 18, "magnet-surface");
     staticBodies.push(solid);
 
@@ -118,7 +108,7 @@ export function buildWorld(): BuiltWorld {
 
   // Hazards
   const hazardBodies: Matter.Body[] = [];
-  for (const h of hazards) {
+  for (const h of level.hazards) {
     const body = Bodies.rectangle(h.x + h.w / 2, h.y + h.h / 2, h.w, h.h, {
       isStatic: true,
       isSensor: true,
@@ -132,7 +122,7 @@ export function buildWorld(): BuiltWorld {
 
   // Collectibles
   const collectibleBodies = new Map<string, Matter.Body>();
-  for (const c of collectibles) {
+  for (const c of level.collectibles) {
     const body = Bodies.circle(c.x, c.y, 15, {
       isStatic: true,
       isSensor: true,
@@ -145,7 +135,7 @@ export function buildWorld(): BuiltWorld {
   }
 
   const hiddenBodies = new Map<string, Matter.Body>();
-  for (const c of hiddenCollectibles) {
+  for (const c of level.hiddenCollectibles) {
     const body = Bodies.circle(c.x, c.y, 18, {
       isStatic: true,
       isSensor: true,
@@ -159,7 +149,7 @@ export function buildWorld(): BuiltWorld {
 
   // Checkpoints
   const checkpointBodies = new Map<string, Matter.Body>();
-  for (const cp of checkpoints) {
+  for (const cp of level.checkpoints) {
     const body = Bodies.rectangle(cp.x, cp.y, 40, 140, {
       isStatic: true,
       isSensor: true,
@@ -172,7 +162,7 @@ export function buildWorld(): BuiltWorld {
   }
 
   // Finish
-  const finishBody = Bodies.rectangle(finish.x, finish.y, finish.w, finish.h, {
+  const finishBody = Bodies.rectangle(level.finish.x, level.finish.y, level.finish.w, level.finish.h, {
     isStatic: true,
     isSensor: true,
     label: "finish",

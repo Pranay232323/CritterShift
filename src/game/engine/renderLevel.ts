@@ -1,13 +1,4 @@
-import {
-  checkpoints,
-  collectibles,
-  finish,
-  groundPolylines,
-  hazards,
-  hiddenCollectibles,
-  landmarks,
-  platforms,
-} from "../levelData";
+import type { LevelDefinition } from "../levelData";
 import type { MagnetSurfaceInfo } from "./terrainBuilder";
 
 export interface LevelRenderOptions {
@@ -26,10 +17,11 @@ export function renderLevel(
   toY: (y: number) => number,
   width: number,
   height: number,
+  level: LevelDefinition,
   opts: LevelRenderOptions
 ) {
   // Ground chains
-  for (const chain of groundPolylines) {
+  for (const chain of level.groundPolylines) {
     if (chain.length < 2) continue;
     ctx.beginPath();
     ctx.moveTo(toX(chain[0].x), toY(chain[0].y));
@@ -38,9 +30,9 @@ export function renderLevel(
     ctx.lineTo(toX(chain[0].x), height + 80);
     ctx.closePath();
     const grad = ctx.createLinearGradient(0, toY(chain[0].y), 0, height);
-    grad.addColorStop(0, "#8a5a3b");
-    grad.addColorStop(0.08, "#6e4730");
-    grad.addColorStop(1, "#4a3220");
+    grad.addColorStop(0, lighten(level.groundBottom));
+    grad.addColorStop(0.08, level.groundBottom);
+    grad.addColorStop(1, level.groundBottom);
     ctx.fillStyle = grad;
     ctx.fill();
 
@@ -49,17 +41,17 @@ export function renderLevel(
     ctx.moveTo(toX(chain[0].x), toY(chain[0].y));
     for (let i = 1; i < chain.length; i++) ctx.lineTo(toX(chain[i].x), toY(chain[i].y));
     ctx.lineWidth = 10;
-    ctx.strokeStyle = "#5fbf5f";
+    ctx.strokeStyle = level.groundTop;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.stroke();
     ctx.lineWidth = 4;
-    ctx.strokeStyle = "#7fd87f";
+    ctx.strokeStyle = lighten(level.groundTop);
     ctx.stroke();
   }
 
   // Platforms
-  for (const p of platforms) {
+  for (const p of level.platforms) {
     const x = toX(p.x);
     const y = toY(p.y);
     ctx.fillStyle = "#b98652";
@@ -72,7 +64,7 @@ export function renderLevel(
   }
 
   // Hazards (spike strip)
-  for (const h of hazards) {
+  for (const h of level.hazards) {
     const baseX = toX(h.x);
     const baseY = toY(h.y);
     ctx.fillStyle = "#3a2b22";
@@ -132,17 +124,17 @@ export function renderLevel(
   }
 
   // Collectibles
-  for (const c of collectibles) {
+  for (const c of level.collectibles) {
     if (opts.collected.has(c.id)) continue;
     drawOrb(ctx, toX(c.x), toY(c.y), opts.timeSec, "#ffd23f", "#ff9a3f", 13);
   }
-  for (const c of hiddenCollectibles) {
+  for (const c of level.hiddenCollectibles) {
     if (opts.hiddenFound.has(c.id)) continue;
     drawOrb(ctx, toX(c.x), toY(c.y), opts.timeSec, "#9ef2ff", "#4fc3ff", 17, true);
   }
 
   // Checkpoints
-  for (const cp of checkpoints) {
+  for (const cp of level.checkpoints) {
     const x = toX(cp.x);
     const y = toY(cp.y + 70);
     const active = opts.activeCheckpointId === cp.id;
@@ -168,21 +160,21 @@ export function renderLevel(
 
   // Finish gate
   {
-    const x = toX(finish.x);
-    const y = toY(finish.y);
-    const h = finish.h;
+    const x = toX(level.finish.x);
+    const y = toY(level.finish.y);
+    const h = level.finish.h;
     ctx.save();
     ctx.strokeStyle = "#7a5230";
     ctx.lineWidth = 14;
     ctx.beginPath();
-    ctx.moveTo(x - finish.w / 2, y + h / 2);
-    ctx.lineTo(x - finish.w / 2, y - h / 2);
-    ctx.lineTo(x + finish.w / 2, y - h / 2);
-    ctx.lineTo(x + finish.w / 2, y + h / 2);
+    ctx.moveTo(x - level.finish.w / 2, y + h / 2);
+    ctx.lineTo(x - level.finish.w / 2, y - h / 2);
+    ctx.lineTo(x + level.finish.w / 2, y - h / 2);
+    ctx.lineTo(x + level.finish.w / 2, y + h / 2);
     ctx.stroke();
     ctx.fillStyle = "#ffd23f";
     for (let i = 0; i < 5; i++) {
-      const fx = x - finish.w / 2 + (i / 4) * finish.w;
+      const fx = x - level.finish.w / 2 + (i / 4) * level.finish.w;
       ctx.beginPath();
       ctx.arc(fx, y - h / 2, 8, 0, Math.PI * 2);
       ctx.fill();
@@ -195,12 +187,20 @@ export function renderLevel(
   }
 
   // Landmark signposts
-  for (const l of landmarks) {
+  for (const l of level.landmarks) {
     const x = toX(l.x);
     const y = toY(l.y);
     if (x < -60 || x > width + 60) continue;
     drawSign(ctx, x, y, l.label);
   }
+}
+
+function lighten(hex: string): string {
+  const value = Number.parseInt(hex.slice(1), 16);
+  const channels = [value >> 16, (value >> 8) & 255, value & 255].map((channel) =>
+    Math.min(255, channel + 32).toString(16).padStart(2, "0")
+  );
+  return `#${channels.join("")}`;
 }
 
 function drawOrb(

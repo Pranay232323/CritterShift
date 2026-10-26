@@ -37,6 +37,7 @@ export class ShiftlingPlayer {
   form: MovementForm = "roll";
   grounded = false;
   groundedTimer = 0; // coyote time
+  jumpBufferTimer = 0;
   airTime = 0;
   facing: 1 | -1 = 1;
 
@@ -236,6 +237,7 @@ export class ShiftlingPlayer {
     this.recoverCooldown = Math.max(0, this.recoverCooldown - dtSec);
     this.collectPulse = Math.max(0, this.collectPulse - dtSec * 2);
     this.transformFlash = Math.max(0, this.transformFlash - dtSec * 2);
+    this.jumpBufferTimer = input.jumpPressed ? 0.12 : Math.max(0, this.jumpBufferTimer - dtSec);
 
     if (input.left && !input.right) this.facing = -1;
     else if (input.right && !input.left) this.facing = 1;
@@ -293,14 +295,24 @@ export class ShiftlingPlayer {
       Body.setAngularVelocity(this.chassis, this.chassis.angularVelocity + airControl * 0.012);
     }
 
-    if (input.jumpPressed && this.grounded) {
+    if (this.jumpBufferTimer > 0 && this.grounded) {
       const jumpVy = -8.6;
       Body.setVelocity(this.chassis, { x: this.chassis.velocity.x, y: jumpVy });
       if (this.wheelBack) Body.setVelocity(this.wheelBack, { x: this.wheelBack.velocity.x, y: jumpVy });
       if (this.wheelFront) Body.setVelocity(this.wheelFront, { x: this.wheelFront.velocity.x, y: jumpVy });
       this.grounded = false;
       this.groundedTimer = 0;
+      this.jumpBufferTimer = 0;
       this.events.onJump?.();
+    } else if (!input.jumpHeld && this.chassis.velocity.y < -3) {
+      const cutJumpVelocity = (body: Matter.Body | null) => {
+        if (body && body.velocity.y < -3) {
+          Body.setVelocity(body, { x: body.velocity.x, y: body.velocity.y * 0.92 });
+        }
+      };
+      cutJumpVelocity(this.chassis);
+      cutJumpVelocity(this.wheelBack);
+      cutJumpVelocity(this.wheelFront);
     }
   }
 
@@ -313,7 +325,7 @@ export class ShiftlingPlayer {
     vx = Matter.Common.clamp(vx, -9, 9);
 
     let vy = this.chassis.velocity.y;
-    if (input.jumpHeld) vy -= 0.4; // flap counteracts gravity's ~0.28/step pull, giving a net climb
+    if (input.jumpHeld) vy -= 0.4; // sustained flapping trades speed for lift
     vy = Matter.Common.clamp(vy, -6.5, 7); // terminal fall speed while gliding
 
     Body.setVelocity(this.chassis, { x: vx, y: vy });

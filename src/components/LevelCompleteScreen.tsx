@@ -1,5 +1,6 @@
 import { useGameStore } from "../game/store";
 import { audio } from "../game/engine/audio";
+import { getLevelById, getNextLevel } from "../game/levelData";
 
 function formatTime(ms: number): string {
   const totalSec = ms / 1000;
@@ -13,14 +14,17 @@ export default function LevelCompleteScreen() {
   const restart = useGameStore((s) => s.restart);
   const goTitle = useGameStore((s) => s.goTitle);
   const openCustomize = useGameStore((s) => s.openCustomize);
+  const startGame = useGameStore((s) => s.startGame);
 
   if (!stats) return null;
+  const level = getLevelById(stats.levelId);
+  const nextLevel = getNextLevel(stats.levelId);
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-gradient-to-b from-sky-200/90 to-emerald-200/90 backdrop-blur-sm">
       <div className="w-[22rem] rounded-3xl bg-white/95 p-6 text-center shadow-2xl ring-4 ring-amber-200">
         <div className="mb-1 text-5xl">🏁</div>
-        <h2 className="mb-1 text-3xl font-black text-emerald-700">Garden Cleared!</h2>
+        <h2 className="mb-1 text-3xl font-black text-emerald-700">{level.name} Cleared!</h2>
         <p className="mb-4 text-sm font-semibold text-slate-500">Your Shiftling made it to the finish.</p>
 
         <div className="mb-4 grid grid-cols-2 gap-3 text-left">
@@ -31,6 +35,17 @@ export default function LevelCompleteScreen() {
         </div>
 
         <div className="flex flex-col gap-2">
+          {nextLevel && (
+            <button
+              onClick={() => {
+                audio.play("click");
+                startGame(nextLevel.id);
+              }}
+              className="rounded-xl bg-gradient-to-b from-emerald-300 to-emerald-500 px-5 py-3 text-lg font-extrabold text-emerald-950 shadow-[0_4px_0_rgba(34,110,73,0.8)] transition active:translate-y-1 active:shadow-none"
+            >
+              ▶ Next World: {nextLevel.name}
+            </button>
+          )}
           <button
             onClick={() => {
               audio.play("click");

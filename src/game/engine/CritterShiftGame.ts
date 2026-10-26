@@ -6,14 +6,14 @@ import { drawBackground } from "./background";
 import { renderLevel } from "./renderLevel";
 import { ParticleSystem } from "./particles";
 import { audio } from "./audio";
-import { checkpoints, startPosition, DEATH_Y, WORLD_MIN_X, WORLD_MAX_X, collectibles, hiddenCollectibles } from "../levelData";
+import type { LevelDefinition } from "../levelData";
 import type { ColorScheme, HudSnapshot, MovementForm } from "../types";
 
 const { Engine, World, Events } = Matter;
 
 export interface CritterShiftCallbacks {
   onHud: (hud: HudSnapshot) => void;
-  onComplete: (stats: { timeMs: number; energy: number; totalEnergy: number; hidden: number; totalHidden: number }) => void;
+  onComplete: (stats: { levelId: string; timeMs: number; energy: number; totalEnergy: number; hidden: number; totalHidden: number }) => void;
 }
 
 const FIXED_DT = 1 / 60;
@@ -25,6 +25,7 @@ export class CritterShiftGame {
   private engine: Matter.Engine;
   private world: BuiltWorld;
   private player: ShiftlingPlayer;
+  private level: LevelDefinition;
   private particles = new ParticleSystem();
   private callbacks: CritterShiftCallbacks;
 
@@ -37,13 +38,13 @@ export class CritterShiftGame {
   private running = false;
   paused = false;
 
-  private camX = startPosition.x;
-  private camY = startPosition.y - 60;
+  private camX = 0;
+  private camY = 0;
 
   private collected = new Set<string>();
   private hiddenFound = new Set<string>();
-  private activeCheckpointId = "cp0";
-  private activeCheckpointPos = { x: startPosition.x, y: startPosition.y };
+  private activeCheckpointId: string;
+  private activeCheckpointPos: { x: number; y: number };
 
   private elapsedMs = 0;
   private levelComplete = false;
@@ -64,21 +65,29 @@ export class CritterShiftGame {
   private keydownHandler = (e: KeyboardEvent) => this.onKeyDown(e);
   private keyupHandler = (e: KeyboardEvent) => this.onKeyUp(e);
 
-  constructor(canvas: HTMLCanvasElement, colors: ColorScheme, callbacks: CritterShiftCallbacks) {
+  constructor(canvas: HTMLCanvasElement, colors: ColorScheme, level: LevelDefinition, callbacks: CritterShiftCallbacks) {
     this.canvas = canvas;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("2D canvas context unavailable");
     this.ctx = ctx;
     this.callbacks = callbacks;
+    this.level = level;
+    this.camX = level.startPosition.x;
+    this.camY = level.startPosition.y - 60;
+    const firstCheckpoint = level.checkpoints[0];
+    this.activeCheckpointId = firstCheckpoint?.id ?? "";
+    this.activeCheckpointPos = firstCheckpoint
+      ? { x: firstCheckpoint.x, y: firstCheckpoint.y }
+      : { ...level.startPosition };
 
     this.engine = Engine.create();
     this.engine.gravity.y = 1;
     this.engine.gravity.scale = 0.001;
 
-    this.world = buildWorld();
+    this.world = buildWorld(level);
     World.add(this.engine.world, [...this.world.staticBodies, ...this.world.sensorBodies]);
 
-    this.player = new ShiftlingPlayer(this.engine.world, this.engine, startPosition.x, startPosition.y, colors, {
+    this.player = new ShiftlingPlayer(this.engine.world, this.engine, level.startPosition.x, level.startPosition.y, colors, {
       onLand: (impact) => {
         audio.play("land");
         if (impact > 0.3) this.particles.spawnBurst(this.player.position.x, this.player.position.y + 14, "#f2e9d8", 6, { gravity: 0.3 });
@@ -224,7 +233,7 @@ export class CritterShiftGame {
       const id = label.split(":")[1];
       if (this.activeCheckpointId !== id) {
         this.activeCheckpointId = id;
-        const cp = checkpoints.find((c) => c.id === id);
+        const cp = this.level.checkpoints.find((c) => c.id === id);
         if (cp) this.activeCheckpointPos = { x: cp.x, y: cp.y };
         audio.play("checkpoint");
         this.particles.spawnBurst(b.position.x, b.position.y, "#54e08a", 14);
@@ -278,11 +287,12 @@ export class CritterShiftGame {
     }
     this.player.celebrating = true;
     this.callbacks.onComplete({
+      levelId: this.level.id,
       timeMs: Math.round(this.elapsedMs),
       energy: this.collected.size,
-      totalEnergy: collectibles.length,
+      totalEnergy: this.level.collectibles.length,
       hidden: this.hiddenFound.size,
-      totalHidden: hiddenCollectibles.length,
+      totalHidden: this.level.hiddenCollectibles.length,
     });
   }
 
@@ -338,14 +348,14 @@ export class CritterShiftGame {
       this.particles.spawnDust(this.player.position.x - this.player.facing * 22, this.player.position.y + 16, this.player.facing * Math.sign(this.player.velocity.x || 1));
     }
 
-    if (this.player.position.y > DEATH_Y) this.triggerRespawn();
+    if (this.player.position.y > this.level.deathY) this.triggerRespawn();
 
     Engine.update(this.engine, dt * 1000);
     this.particles.update(dt);
 
     // camera smoothing with mild look-ahead
     const lookAhead = Matter.Common.clamp(this.player.velocity.x * 10, -90, 90);
-    const targetX = Matter.Common.clamp(this.player.position.x + lookAhead, WORLD_MIN_X, WORLD_MAX_X);
+    const targetX = Matter.Common.clamp(this.player.position.x + lookAhead, this.level.worldMinX, this.level.worldMaxX);
     const targetY = Matter.Common.clamp(this.player.position.y - 40, -50, 760);
     this.camX += (targetX - this.camX) * Math.min(1, dt * 3.5);
     this.camY += (targetY - this.camY) * Math.min(1, dt * 3.5);
@@ -364,9 +374,9 @@ export class CritterShiftGame {
     this.callbacks.onHud({
       form: this.player.form,
       energy: this.collected.size,
-      totalEnergyInLevel: collectibles.length,
+      totalEnergyInLevel: this.level.collectibles.length,
       hiddenFound: this.hiddenFound.size,
-      totalHidden: hiddenCollectibles.length,
+      totalHidden: this.level.hiddenCollectibles.length,
       elapsedMs: this.elapsedMs,
       speedKph: this.player.speedKph(),
       grounded: this.player.grounded,
@@ -379,12 +389,12 @@ export class CritterShiftGame {
   private render() {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.width, this.height);
-    drawBackground(ctx, this.width, this.height, this.camX, this.camY, this.timeSec);
+    drawBackground(ctx, this.width, this.height, this.camX, this.camY, this.timeSec, this.level.background);
 
     const toX = (x: number) => x - this.camX + this.width / 2;
     const toY = (y: number) => y - this.camY + this.height / 2;
 
-    renderLevel(ctx, toX, toY, this.width, this.height, {
+    renderLevel(ctx, toX, toY, this.width, this.height, this.level, {
       collected: this.collected,
       hiddenFound: this.hiddenFound,
       activeCheckpointId: this.activeCheckpointId,
@@ -429,5 +439,3 @@ export class CritterShiftGame {
     );
   }
 }
-
-

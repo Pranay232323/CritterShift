@@ -14,7 +14,7 @@ function formatTime(ms: number): string {
   return `${m}:${s}`;
 }
 
-export default function HUD({ onPause }: { onPause: () => void }) {
+export default function HUD({ onPause, levelName }: { onPause: () => void; levelName: string }) {
   const hud = useGameStore((s) => s.hud);
   const meta = FORM_META[hud.form];
 
@@ -23,6 +23,9 @@ export default function HUD({ onPause }: { onPause: () => void }) {
       {/* Top bar */}
       <div className="flex items-start justify-between p-3 sm:p-4">
         <div className="flex gap-2">
+          <div className="hidden items-center rounded-2xl bg-black/35 px-3 py-2 text-sm font-bold text-white backdrop-blur-sm ring-1 ring-white/20 sm:flex">
+            {levelName}
+          </div>
           <div className="pointer-events-auto flex items-center gap-2 rounded-2xl bg-black/35 px-3 py-2 backdrop-blur-sm ring-1 ring-white/20">
             <span className="text-xl" style={{ color: "#ffd23f" }}>
               ⚡

@@ -1,13 +1,17 @@
 import { useGameStore } from "../game/store";
 import { audio } from "../game/engine/audio";
+import { LEVELS } from "../game/levelData";
 
 export default function TitleScreen() {
   const startGame = useGameStore((s) => s.startGame);
   const openCustomize = useGameStore((s) => s.openCustomize);
   const save = useGameStore((s) => s.save);
+  const selectedLevelId = useGameStore((s) => s.selectedLevelId);
+  const selectLevel = useGameStore((s) => s.selectLevel);
   const toggleMute = useGameStore((s) => s.toggleMute);
 
   const bestTime = save.bestTimeMs !== null ? formatTime(save.bestTimeMs) : "—";
+  const selectedLevel = LEVELS.find((level) => level.id === selectedLevelId) ?? LEVELS[0];
 
   return (
     <div
@@ -30,6 +34,35 @@ export default function TitleScreen() {
       </div>
 
       <div className="relative z-10 flex w-full max-w-md flex-col items-center gap-4">
+        <div className="grid w-full grid-cols-3 gap-2">
+          {LEVELS.map((level, index) => {
+            const unlocked = save.unlockedLevelIds.includes(level.id);
+            const selected = selectedLevelId === level.id;
+            return (
+              <button
+                key={level.id}
+                disabled={!unlocked}
+                onClick={() => {
+                  audio.play("click");
+                  selectLevel(level.id);
+                }}
+                className={`rounded-xl px-3 py-2 text-left ring-1 transition ${
+                  selected
+                    ? "bg-amber-300/90 text-amber-950 ring-amber-100"
+                    : unlocked
+                      ? "bg-black/40 text-white ring-white/30 hover:bg-black/55"
+                      : "cursor-not-allowed bg-black/25 text-white/50 ring-white/15"
+                }`}
+              >
+                <span className="block text-[10px] font-bold uppercase tracking-widest">
+                  {unlocked ? `World ${index + 1}` : "Locked"}
+                </span>
+                <span className="block text-sm font-extrabold leading-tight">{level.name}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-center text-xs font-semibold text-white/80">{selectedLevel.subtitle}</p>
         <button
           onClick={() => {
             audio.resume();
@@ -38,7 +71,7 @@ export default function TitleScreen() {
           }}
           className="w-full rounded-2xl bg-gradient-to-b from-amber-300 to-amber-500 px-8 py-4 text-2xl font-extrabold text-amber-950 shadow-[0_6px_0_rgba(146,88,0,0.8)] ring-2 ring-amber-200 transition active:translate-y-1 active:shadow-[0_2px_0_rgba(146,88,0,0.8)]"
         >
-          ▶ PLAY
+          ▶ PLAY WORLD
         </button>
 
         <button

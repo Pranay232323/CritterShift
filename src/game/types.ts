@@ -25,6 +25,9 @@ export interface SaveData {
   unlockedColors: string[];
   selectedColor: string;
   levelCompletedOnce: boolean;
+  unlockedLevelIds: string[];
+  selectedLevelId: string;
+  bestTimes: Record<string, number>;
   muted: boolean;
 }
 
