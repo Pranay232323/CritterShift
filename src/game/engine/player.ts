@@ -339,7 +339,8 @@ export class ShiftlingPlayer {
     this.wingT = Math.min(1, this.wingT + dtSec * 4);
 
     const steer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    const vx = Matter.Common.clamp(this.chassis.velocity.x + steer * 0.12, -this.vehicle.maxSpeed, this.vehicle.maxSpeed);
+    const topSpeed = this.vehicle.maxSpeed + this.upgrades.engine * 0.8;
+    const vx = Matter.Common.clamp(this.chassis.velocity.x + steer * 0.12, -topSpeed, topSpeed);
 
     let vy = this.chassis.velocity.y;
     if (input.jumpPressed) vy = Math.min(vy - 2.4 - this.upgrades.jump * 0.08, -3);
@@ -369,7 +370,8 @@ export class ShiftlingPlayer {
     if (!this.attachedSurface) {
       const steer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
       const drive = this.vehicle.drive + this.upgrades.engine * 0.035;
-      const vx = Matter.Common.clamp(this.chassis.velocity.x + steer * drive * 0.6, -this.vehicle.maxSpeed, this.vehicle.maxSpeed);
+      const topSpeed = this.vehicle.maxSpeed + this.upgrades.engine * 0.8;
+      const vx = Matter.Common.clamp(this.chassis.velocity.x + steer * drive * 0.6, -topSpeed, topSpeed);
       Body.setVelocity(this.chassis, { x: vx, y: Matter.Common.clamp(this.chassis.velocity.y, -12, 12) });
 
       for (const surf of magnetSurfaces) {

@@ -13,6 +13,10 @@ export interface Rect {
   angle?: number;
 }
 
+export interface CourseObstacle extends Rect {
+  kind: "crate" | "barrier" | "tower";
+}
+
 export interface MagnetSegment {
   x1: number;
   y1: number;
@@ -51,6 +55,7 @@ export interface LevelDefinition {
   groundPolylines: Point[][];
   platforms: Rect[];
   hazards: Rect[];
+  obstacles?: CourseObstacle[];
   magnetSegments: MagnetSegment[];
   collectibles: Collectible[];
   hiddenCollectibles: Collectible[];
@@ -62,6 +67,8 @@ export interface LevelDefinition {
   worldMaxX: number;
   deathY: number;
   landmarks: { x: number; y: number; label: string }[];
+  /** The advertised journey length, kept separate from world pixels for the title card. */
+  journeyDistanceKm?: number;
 }
 
 const BASELINE = 560;
@@ -547,6 +554,122 @@ const frostpeak: LevelDefinition = {
   ],
 };
 
+const EXPEDITION_SCENES: Array<LevelDefinition["background"]["scenery"]> = [
+  "garden", "hollow", "canopy", "desert", "alpine",
+];
+const EXPEDITION_PALETTES = [
+  ["#65c96b", "#3b281d", "#b9edff", "#e7fff0", "#9bd8aa", "#68bd87"],
+  ["#e58bb2", "#4b2948", "#f7d4ee", "#fff3dc", "#d9a8c3", "#b477a0"],
+  ["#63b879", "#254331", "#bde8df", "#f0ffe4", "#8dcc9b", "#4f9d70"],
+  ["#e5a84e", "#63371f", "#ffd6a0", "#fff0c7", "#e6b26e", "#bb7544"],
+  ["#92cbe0", "#29405e", "#d9f3ff", "#f3fbff", "#a9d8e8", "#6ca9ca"],
+];
+
+/**
+ * Later expeditions are deliberately generated from different recipes. This keeps
+ * the level table maintainable while giving every world its own route, hazards,
+ * magnet puzzle, collectible placement, and checkpoint rhythm.
+ */
+function makeExpedition(index: number): LevelDefinition {
+  const number = index + 6;
+  const distanceKm = 75 + index * 5;
+  const end = distanceKm * 1000;
+  const gapOne = 1800 + (index % 4) * 260;
+  const gapTwo = 9000 + (index % 5) * 380;
+  const gapThree = 18000 + (index % 3) * 520;
+  const gapWidth = 520 + (index % 4) * 95;
+  const magnetX = 27000 + (index % 5) * 700;
+  const palette = EXPEDITION_PALETTES[index % EXPEDITION_PALETTES.length];
+  const ground: Point[][] = [
+    [...rollingTerrain(-200, gapOne, BASELINE, [
+      { amplitude: 18 + index * 2, wavelength: 620 + index * 21, phase: index * 70 },
+      { amplitude: 10 + index, wavelength: 290 + index * 13, phase: 40 },
+    ]), ...ramp(gapOne, BASELINE, gapOne + 260, BASELINE - 150)],
+    [...ramp(gapOne + gapWidth, BASELINE - 150, gapOne + gapWidth + 260, BASELINE),
+      ...rollingTerrain(gapOne + gapWidth + 260, gapTwo, BASELINE, [
+        { amplitude: 24 + index * 2, wavelength: 820 + index * 25, phase: 120 },
+      ]), ...ramp(gapTwo, BASELINE, gapTwo + 300, BASELINE - 180)],
+    [...ramp(gapTwo + gapWidth, BASELINE - 180, gapTwo + gapWidth + 280, BASELINE),
+      ...rollingTerrain(gapTwo + gapWidth + 280, gapThree, BASELINE, [
+        { amplitude: 30 + index * 2, wavelength: 960 + index * 19, phase: 260 },
+        { amplitude: 12, wavelength: 360 + index * 9, phase: 80 },
+      ]), ...ramp(gapThree, BASELINE, gapThree + 320, BASELINE - 170)],
+    [...ramp(gapThree + gapWidth, BASELINE - 170, gapThree + gapWidth + 300, BASELINE),
+      ...rollingTerrain(gapThree + gapWidth + 300, end, BASELINE, [
+        { amplitude: 28 + index * 2, wavelength: 1100 + index * 27, phase: 360 },
+      ])],
+  ];
+  const gaps = [gapOne, gapTwo, gapThree];
+  const obstacleCount = 8 + index;
+  const obstacleCandidates = Array.from({ length: obstacleCount * 3 }, (_, obstacleIndex) => {
+    const progress = (obstacleIndex + 1) / (obstacleCount * 3 + 1);
+    const x = 700 + Math.round((end - 1600) * progress);
+    const nearGap = gaps.some((gap) => Math.abs(x - gap) < gapWidth + 520);
+    const nearMagnet = Math.abs(x - magnetX) < 700;
+    return { x, nearGap, nearMagnet };
+  }).filter((candidate) => !candidate.nearGap && !candidate.nearMagnet).slice(0, obstacleCount);
+  const obstacles = obstacleCandidates.map((candidate, obstacleIndex) => {
+    const height = 26 + Math.min(42, index * 2) + (obstacleIndex % 3) * 8;
+    const width = 42 + (obstacleIndex % 4) * 10;
+    return {
+      x: candidate.x,
+      y: BASELINE - height,
+      w: width,
+      h: height,
+      kind: obstacleIndex % 3 === 0 ? "tower" : obstacleIndex % 2 === 0 ? "barrier" : "crate",
+    } satisfies CourseObstacle;
+  });
+  const platforms = gaps.flatMap((gap, gapIndex) => [
+    { x: gap + 130, y: 460 - ((index + gapIndex) % 3) * 35, w: 150 + (index % 3) * 15, h: 20 },
+    { x: gap + 350, y: 400 - ((index + gapIndex) % 2) * 30, w: 145, h: 20 },
+  ]);
+  const hazards = gaps.map((gap, gapIndex) => ({
+    x: gap + (gapIndex % 2) * 80, y: 650, w: gapWidth + 80 + gapIndex * 55, h: 55 + index * 2,
+  }));
+  const collectibles = Array.from({ length: 18 }, (_, collectibleIndex) => {
+    const x = 500 + Math.round((end - 1000) * (collectibleIndex + 1) / 19);
+    return { id: `exp${number}-energy-${collectibleIndex}`, x, y: BASELINE - 70 - ((collectibleIndex + index) % 4) * 34 };
+  });
+  return {
+    id: `expedition-${number}`,
+    name: ["Copper Circuit", "Moonlit Hollow", "Verdant Switchback", "Sunflare Run", "Glacier Relay"][index % 5] + ` ${number}`,
+    subtitle: `A ${distanceKm} km ${["twisting", "vertical", "windy", "scorching", "frozen"][index % 5]} expedition with three route breaks.`,
+    groundTop: palette[0], groundBottom: palette[1],
+    background: {
+      scenery: EXPEDITION_SCENES[index % EXPEDITION_SCENES.length],
+      skyTop: palette[2], skyMiddle: palette[3], skyBottom: "#fff8e8",
+      farHills: palette[4], nearHills: palette[5], flowerHue: (index * 47) % 360,
+    },
+    groundPolylines: ground,
+    platforms,
+    hazards,
+    obstacles,
+    magnetSegments: [
+      { id: `exp${number}-magnet-rise`, x1: magnetX, y1: 470, x2: magnetX, y2: 190 + (index % 3) * 20 },
+      { id: `exp${number}-magnet-ceiling`, x1: magnetX, y1: 190 + (index % 3) * 20, x2: magnetX + 360 + index * 12, y2: 190 + (index % 3) * 20 },
+      { id: `exp${number}-magnet-drop`, x1: magnetX + 360 + index * 12, y1: 190 + (index % 3) * 20, x2: magnetX + 360 + index * 12, y2: 470 },
+    ],
+    collectibles,
+    hiddenCollectibles: [{ id: `exp${number}-hidden`, x: magnetX + 175, y: 110 + (index % 3) * 15 }],
+    flightZones: gaps.map((gap, gapIndex) => ({
+      id: `exp${number}-flight-${gapIndex}`, startX: gap - 120, endX: gap + gapWidth + 180,
+    })),
+    checkpoints: [0, gapTwo - 700, gapThree - 700, magnetX - 600, end - 850].map((x, checkpointIndex) => ({
+      id: `exp${number}-cp-${checkpointIndex}`, x, y: BASELINE - 60,
+    })),
+    finish: { x: end, y: BASELINE - 180, w: 90, h: 240 },
+    startPosition: { x: -40, y: BASELINE - 80 },
+    worldMinX: -300, worldMaxX: end + 300, deathY: 1250,
+    landmarks: [
+      { x: gapOne, y: BASELINE, label: "jump" },
+      { x: gapTwo, y: BASELINE, label: "glide" },
+      { x: magnetX, y: BASELINE, label: "magnet" },
+      { x: end - 250, y: BASELINE, label: "finish" },
+    ],
+    journeyDistanceKm: distanceKm,
+  };
+}
+
 function surfaceYAt(level: LevelDefinition, x: number): number {
   let closest = { distance: Number.POSITIVE_INFINITY, y: BASELINE };
   for (const chain of level.groundPolylines) {
@@ -582,6 +705,10 @@ function alignLevelSpawns(level: LevelDefinition): LevelDefinition {
   return {
     ...level,
     collectibles,
+    obstacles: level.obstacles?.map((obstacle) => ({
+      ...obstacle,
+      y: surfaceYAt(level, obstacle.x) - obstacle.h,
+    })),
     startPosition: { ...level.startPosition, y: surfaceYAt(level, level.startPosition.x) - 34 },
     checkpoints: level.checkpoints.map((checkpoint) => ({
       ...checkpoint,
@@ -590,7 +717,13 @@ function alignLevelSpawns(level: LevelDefinition): LevelDefinition {
   };
 }
 
-export const LEVELS: LevelDefinition[] = [garden, hollow, canopy, sunscorch, frostpeak].map(alignLevelSpawns);
+export const LEVELS: LevelDefinition[] = [
+  garden, hollow, canopy, sunscorch, frostpeak,
+  ...Array.from({ length: 15 }, (_, index) => makeExpedition(index)),
+].map((level, index) => ({
+  ...alignLevelSpawns(level),
+  journeyDistanceKm: level.journeyDistanceKm ?? 50 + index * 5,
+}));
 export const FIRST_LEVEL_ID = garden.id;
 
 export function getLevelById(id: string): LevelDefinition {

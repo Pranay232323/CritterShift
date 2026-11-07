@@ -81,6 +81,43 @@ export function renderLevel(
     }
   }
 
+  // Solid course obstacles
+  for (const obstacle of level.obstacles ?? []) {
+    const x = toX(obstacle.x);
+    const y = toY(obstacle.y);
+    ctx.save();
+    ctx.fillStyle = obstacle.kind === "tower" ? "#5d416e" : obstacle.kind === "barrier" ? "#b35b3e" : "#8a5a36";
+    ctx.strokeStyle = "#2c2550";
+    ctx.lineWidth = 3;
+    ctx.fillRect(x, y, obstacle.w, obstacle.h);
+    ctx.strokeRect(x, y, obstacle.w, obstacle.h);
+
+    if (obstacle.kind === "tower") {
+      ctx.fillStyle = "#ffd23f";
+      ctx.fillRect(x + obstacle.w * 0.22, y + obstacle.h * 0.18, obstacle.w * 0.56, 6);
+      ctx.fillRect(x + obstacle.w * 0.22, y + obstacle.h * 0.52, obstacle.w * 0.56, 6);
+    } else if (obstacle.kind === "barrier") {
+      ctx.strokeStyle = "#ffd23f";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(x + 5, y + obstacle.h - 5);
+      ctx.lineTo(x + obstacle.w - 5, y + 5);
+      ctx.moveTo(x + 5, y + 5);
+      ctx.lineTo(x + obstacle.w - 5, y + obstacle.h - 5);
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = "#d99b58";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + 5, y + 5);
+      ctx.lineTo(x + obstacle.w - 5, y + obstacle.h - 5);
+      ctx.moveTo(x + obstacle.w - 5, y + 5);
+      ctx.lineTo(x + 5, y + obstacle.h - 5);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // Magnet surfaces
   for (const surf of opts.magnetSurfaces) {
     const x1 = toX(surf.x1);

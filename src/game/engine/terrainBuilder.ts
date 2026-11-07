@@ -76,6 +76,20 @@ export function buildWorld(level: LevelDefinition): BuiltWorld {
     staticBodies.push(body);
   }
 
+  // Solid course obstacles that must be jumped over.
+  for (const obstacle of level.obstacles ?? []) {
+    const body = Bodies.rectangle(obstacle.x + obstacle.w / 2, obstacle.y + obstacle.h / 2, obstacle.w, obstacle.h, {
+      isStatic: true,
+      angle: obstacle.angle ?? 0,
+      friction: 0.8,
+      restitution: 0.05,
+      label: "obstacle",
+      collisionFilter: { category: CAT.GROUND, mask: 0xffffffff },
+      render: { visible: false },
+    });
+    staticBodies.push(body);
+  }
+
   // Magnet surfaces: solid thin body + wider sensor detection zone
   const magnetSurfaces: MagnetSurfaceInfo[] = [];
   for (const seg of level.magnetSegments as MagnetSegment[]) {

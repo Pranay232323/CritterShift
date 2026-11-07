@@ -59,7 +59,7 @@ export default function TitleScreen() {
                 </span>
                 <span className="block text-sm font-extrabold leading-tight">{level.name}</span>
                 <span className="mt-1 block text-[10px] font-semibold opacity-75">
-                  {Math.round((level.finish.x - level.startPosition.x) / 1000)} km journey
+                  {level.journeyDistanceKm ?? Math.round((level.finish.x - level.startPosition.x) / 1000)} km journey
                 </span>
               </button>
             );
